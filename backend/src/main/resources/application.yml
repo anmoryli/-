@@ -1,0 +1,153 @@
+spring:
+  application:
+    name: FullScoreLen
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: Asia/Shanghai
+
+    deserialization:
+      adjust_dates_to_context_time_zone: false
+    serialization:
+      write-dates-as-timestamps: false
+  mvc:
+    async:
+      request-timeout: PT10M
+
+  datasource:
+    # 若 MySQL 在远端或网络较慢，可适当增大 connectTimeout/socketTimeout（单位毫秒）
+    url: jdbc:mysql://175.24.205.213:3306/yunfu?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai&connectTimeout=15000&socketTimeout=30000
+    username: username
+    password: ${MYSQL_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      connection-timeout: 20000
+      initialization-fail-timeout: -1
+
+  data:
+    redis:
+      # Redis 仅用于用户等缓存；连不上时仅打 WARN，不中断请求（见 RedisCacheConfig.CacheErrorHandler）
+      host: ${REDIS_HOST:42.192.61.108}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: 3000ms
+      connect-timeout: 5000
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 0
+
+  ai:
+    openai:
+      api-key: ${OPENAI_API_KEY_PROXY}
+      base-url: https://api.xty.app
+      chat:
+        options:
+          model: gpt-5.2
+      # 继承根节点的 api-key/base-url，无需重复配置
+      image:
+        options:
+          model: dall-e-3  # 可选：补充图片生成模型
+      audio:
+        speech:
+          options:
+            model: tts-1    # 可选：补充语音生成模型
+  mail:
+    host: smtp.qq.com
+    port: 587
+    username: anmory@qq.com
+    password: hwvmqukwraoljici
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+  servlet:
+    multipart:
+      max-file-size: 500MB   # 单个文件最大500MB
+      max-request-size: 500MB # 单次请求最大500MB
+    encoding:
+      charset: UTF-8
+      force-response: true   # 确保 SSE 等响应使用 UTF-8，避免中文乱码
+
+# 加密配置
+security:
+  aes:
+    key: "0123456789abcdef0123456789abcdef"  # 32位AES密钥
+    iv: "abcdef9876543210"                   # 16位IV向量
+
+# MyBatis 核心配置
+mybatis:
+  # Mapper XML 文件路径
+  mapper-locations: classpath:mapper/*.xml
+  # 实体类包路径
+  type-aliases-package: com.anmory.yunji.entity
+  # MyBatis 运行时配置
+  configuration:
+    map-underscore-to-camel-case: true  # 下划线转驼峰（仅配一次）
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl  # 打印SQL日志
+    # 可选：开启懒加载、超时等
+    lazy-loading-enabled: false
+    default-statement-timeout: 30
+
+server:
+  port: 9677
+  tomcat:
+    connection-timeout: PT10M  # 连接超时10分钟
+    async-timeout: 600000       # 异步请求超时10分钟（600000毫秒）
+
+logging:
+  level:
+    org.springframework.ai.retry.autoconfigure.SpringAiRetryAutoConfiguration: ERROR
+
+# 验证码配置
+captcha:
+  width: 100
+  height: 50
+  session:
+    key: SESSION_CAPTCHA_CODE
+    date: SESSION_CAPTCHA_DATE
+
+
+alioss:
+  endpoint: https://oss-cn-beijing.aliyuncs.com
+  access-key-id: LTAI5tHo1do3sdRsjwiMJX9K
+  access-key-secret: n5D03n74eNAgRlaV1fv1JL3JPR5LW0
+  bucket-name: cangqion-delong
+
+wechat:
+  appid: ${sky.wechat.appid}
+  secret: ${sky.wechat.secret}
+
+# 语音转文字：本地 FFmpeg + Whisper.cpp（无 API）
+# 需安装 ffmpeg，并下载 whisper.cpp 及模型（如 ggml-base.bin）
+speech:
+  ffmpeg-path: ffmpeg
+  whisper-path:   # 如 D:/whisper/main.exe
+  whisper-model:  # 如 D:/whisper/models/ggml-base.bin
+
+deepseek:
+  # API密钥
+  api-key: sk-429c75e2a9b34e19aabf308c9196b090
+  # API请求地址
+  base-url: https://api.deepseek.com
+  # 聊天模型配置
+  chat:
+    model: deepseek-chat
+    # 超时时间（毫秒）
+    timeout: 30000
+  # 可选：文本生成模型配置
+  completion:
+    model: deepseek-coder
+    temperature: 0.7
+    max-tokens: 2048
+
+check-report:
+  reminder-cron: ${CHECK_REPORT_REMINDER_CRON:0 0 9 * * ?}
+  max-retry: ${CHECK_REPORT_MAX_RETRY:3}
+
+# AI 主动破冰：为长时间未聊天的孕妇用户创建新会话
+proactive-icebreak:
+  cron: ${PROACTIVE_ICEBREAK_CRON:0 0 20 * * ?}
+  inactive-days: ${PROACTIVE_ICEBREAK_INACTIVE_DAYS:3}

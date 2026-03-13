@@ -1,0 +1,110 @@
+package com.anmory.yunji.service.impl;
+
+import com.anmory.yunji.entity.Memo;
+import com.anmory.yunji.entity.Text;
+import com.anmory.yunji.mapper.MemoMapper;
+import com.anmory.yunji.mapper.TextMapper;
+import com.anmory.yunji.service.MemoAiEnrichmentService;
+import com.anmory.yunji.service.PromptService;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.scheduling.annotation.Async;
+import org.springframework.stereotype.Service;
+
+import java.util.Map;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class MemoAiEnrichmentServiceImpl implements MemoAiEnrichmentService {
+
+    private final TextMapper textMapper;
+    private final MemoMapper memoMapper;
+    private final ChatClient chatClient;
+    private final PromptService promptService;
+
+    private static final String PLACEHOLDER_TITLE = "记录";
+
+    @Override
+    @Async
+    public void enrichTextAsync(Integer memoId, String content) {
+        if (memoId == null || content == null) return;
+        try {
+            Text text = textMapper.selectByMemoId(memoId);
+            if (text == null) return;
+
+            boolean needsTitle = isPlaceholderTitle(text.getTitle(), content);
+            boolean needsCategory = true;
+            Memo memo = memoMapper.selectByIdCompat(memoId);
+            if (memo != null && memo.getCategory() != null && !memo.getCategory().isBlank()) {
+                needsCategory = false;
+            }
+
+            if (needsTitle) {
+                String title = generateTitle(content);
+                if (title != null && !title.isBlank()) {
+                    text.setTitle(title);
+                    textMapper.updateById(text);
+                    log.info("AI 标题已更新 memoId={} title={}", memoId, title);
+                }
+            }
+
+            if (needsCategory && memo != null) {
+                String category = generateCategory(content);
+                if (category != null && !category.isBlank()) {
+                    memoMapper.updateCategory(memoId, category);
+                    log.info("AI 分类已更新 memoId={} category={}", memoId, category);
+                }
+            }
+        } catch (Exception e) {
+            log.warn("AI 增强失败 memoId={}", memoId, e);
+        }
+    }
+
+    private boolean isPlaceholderTitle(String title, String content) {
+        if (title == null || title.isBlank()) return true;
+        if (PLACEHOLDER_TITLE.equals(title)) return true;
+        String truncated = content.length() > 20 ? content.substring(0, 20) + "…" : content;
+        return truncated.equals(title) || (content.length() > 20 && title.startsWith(content.substring(0, Math.min(20, content.length()))));
+    }
+
+    private String generateTitle(String content) {
+        try {
+            String promptStr = promptService.getUserPrompt("memo_text_title", "default", Map.of("content", content));
+            if (promptStr == null || promptStr.isBlank()) {
+                promptStr = "请为以下孕期记录生成一个简洁的标题（不超过20字）：" + content;
+            }
+            String result = chatClient.prompt().user(promptStr).call().content();
+            return result != null ? result.trim() : null;
+        } catch (Exception e) {
+            log.warn("生成标题失败", e);
+            return null;
+        }
+    }
+
+    private static final String DEFAULT_CATEGORY = "日记";
+    private static final String[] FORBIDDEN_CATEGORY_PHRASES = {"信息不足", "无法分类", "无法判断"};
+
+    private String generateCategory(String content) {
+        try {
+            String promptStr = promptService.getUserPrompt("memo_category_tag", "default", Map.of("content", content));
+            if (promptStr == null || promptStr.isBlank()) return DEFAULT_CATEGORY;
+            String result = chatClient.prompt().user(promptStr).call().content();
+            return normalizeCategory(result);
+        } catch (Exception e) {
+            log.warn("生成分类失败", e);
+            return DEFAULT_CATEGORY;
+        }
+    }
+
+    /** 禁止返回「信息不足」「无法分类」等，必须返回至少一个有效标签 */
+    private String normalizeCategory(String raw) {
+        if (raw == null || raw.isBlank()) return DEFAULT_CATEGORY;
+        String t = raw.trim();
+        for (String phrase : FORBIDDEN_CATEGORY_PHRASES) {
+            if (t.contains(phrase)) return DEFAULT_CATEGORY;
+        }
+        return t;
+    }
+}

@@ -1,0 +1,110 @@
+# ========================= 基础通用忽略（所有SpringBoot/Maven项目必加）=========================
+# Maven核心编译/构建目录（最关键，避免上传编译后的class文件）
+target/
+!**/src/main/**/target/
+!**/src/test/**/target/
+# Maven包装器（本地自动生成，无需共享）
+.mvn/wrapper/maven-wrapper.jar
+.mvn/timing.properties
+# Maven构建临时文件
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+
+# ========================= 多IDE配置文件忽略（覆盖主流开发工具，团队协作无冲突）=========================
+# IntelliJ IDEA（你主要使用的IDE，全覆盖）
+.idea/
+*.iws
+*.iml
+*.ipr
+out/
+# STS/Eclipse（适配团队中使用Eclipse/STS的队友）
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings/
+.springBeans
+.sts4-cache/
+bin/
+# VS Code（轻量编辑器适配）
+.vscode/
+*.code-workspace
+# NetBeans（小众IDE兜底）
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+build/
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+# ========================= 系统/临时文件忽略（跨Windows/Mac/Linux，避免垃圾文件）=========================
+# Windows系统
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.tmp
+*.bak
+*.swp
+# Mac系统
+.DS_Store
+.AppleDouble
+.LSOverride
+# Linux系统
+*~
+# 通用临时文件
+*.temp
+*.cache
+
+# ========================= 日志/日志配置文件（日志文件动态生成，无需提交）=========================
+*.log
+logs/
+log/
+# 日志框架配置（若本地有自定义日志配置，可保留，此处忽略动态日志文件）
+logback-spring.xml.bak
+log4j2.xml.bak
+
+# ========================= 敏感配置/环境配置文件（重点！避免上传密钥/密码）=========================
+# 本地开发配置（必忽略，包含数据库密码、OSS密钥等敏感信息）
+application-dev.yml
+application-dev.properties
+# 生产环境配置（绝对忽略，生产环境密钥不可泄露）
+application-prod.yml
+application-prod.properties
+# 测试环境配置
+application-test.yml
+application-test.properties
+# 自定义环境配置
+application-*.yml
+application-*.properties
+# 配置文件备份
+*.yml.bak
+*.properties.bak
+# 本地配置覆盖文件（git忽略，本地自定义）
+application-local.yml
+
+# ========================= 构建/缓存/第三方工具忽略（兜底，无冗余）=========================
+# 构建工具缓存
+.gradle/
+gradle/
+gradlew
+gradlew.bat
+build/
+# 代码覆盖率报告（本地生成，无需共享）
+coverage/
+jacoco/
+# 第三方工具配置
+sonar-project.properties
+*.jmx
+# 临时上传/下载文件
+upload/
+download/
+# IDE运行配置
+.run/

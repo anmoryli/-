@@ -1,0 +1,25 @@
+{
+  "name": "孕期宝",
+  "short_name": "孕期宝",
+  "description": "孕期记录·把每一天都留下来",
+  "start_url": "/",
+  "display": "standalone",
+  "theme_color": "#E3B8B0",
+  "background_color": "#ffffff",
+  "icons": [
+    {
+      "src": "/icon-light-32x32.png",
+      "sizes": "32x32",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "categories": ["lifestyle", "health"],
+  "lang": "zh-CN"
+}

@@ -1,0 +1,115 @@
+"use client"
+
+import { useState } from "react"
+import { useRouter } from "next/navigation"
+import { ArrowLeft, Mail } from "lucide-react"
+import { useAuth } from "@/lib/auth-context"
+import { bindEmail } from "@/lib/api/user"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Button } from "@/components/ui/button"
+import { toast } from "sonner"
+
+export default function BindEmailPage() {
+  const router = useRouter()
+  const { user, setUser } = useAuth()
+  const [email, setEmail] = useState("")
+  const [loading, setLoading] = useState(false)
+
+  if (!user) return null
+
+  const handleBind = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const trimmed = email.trim()
+    if (!trimmed) {
+      toast.error("请输入邮箱")
+      return
+    }
+    const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRe.test(trimmed)) {
+      toast.error("请输入有效的邮箱地址")
+      return
+    }
+    setLoading(true)
+    try {
+      await bindEmail(user.userId, trimmed)
+      setUser({ ...user, email: trimmed })
+      toast.success("邮箱已绑定")
+      router.push("/profile")
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "绑定失败")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (user.email) {
+    return (
+      <div className="min-h-dvh bg-[var(--background)] px-4 pb-8">
+        <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-[var(--card-border)] bg-[var(--background)]/95 px-4 py-4 backdrop-blur-sm">
+          <button
+            onClick={() => router.push("/profile")}
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--muted)] transition-colors active:bg-[var(--muted)]/80"
+          >
+            <ArrowLeft className="h-5 w-5" strokeWidth={1.75} />
+          </button>
+          <h1 className="text-lg font-semibold text-[var(--foreground)]">绑定邮箱</h1>
+        </div>
+        <div className="mt-6 rounded-2xl border border-[var(--card-border)] bg-[var(--card)] p-6">
+          <div className="flex items-center gap-3">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--accent-1-muted)] text-[var(--accent-1)]">
+              <Mail className="h-6 w-6" strokeWidth={1.75} />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-[var(--foreground-muted)]">已绑定邮箱</p>
+              <p className="mt-0.5 font-medium text-[var(--foreground)]">{user.email}</p>
+              <p className="mt-2 text-xs text-[var(--foreground-muted)]">
+                绑定邮箱后，可使用「找回密码」功能重置密码
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-dvh bg-[var(--background)] px-4 pb-8">
+      <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-[var(--card-border)] bg-[var(--background)]/95 px-4 py-4 backdrop-blur-sm">
+        <button
+          onClick={() => router.push("/profile")}
+          className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--muted)] transition-colors active:bg-[var(--muted)]/80"
+        >
+          <ArrowLeft className="h-5 w-5" strokeWidth={1.75} />
+        </button>
+        <h1 className="text-lg font-semibold text-[var(--foreground)]">绑定邮箱</h1>
+      </div>
+      <div className="mt-6 rounded-2xl border border-[var(--card-border)] bg-[var(--card)] p-6">
+        <p className="text-sm text-[var(--foreground-muted)]">
+          绑定邮箱后，可通过「忘记密码」在登录页重置密码
+        </p>
+        <form onSubmit={handleBind} className="mt-6 space-y-4">
+          <div>
+            <Label htmlFor="email">邮箱</Label>
+            <Input
+              id="email"
+              type="email"
+              placeholder="请输入邮箱"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="mt-2 border-[var(--card-border)] bg-[var(--background)]"
+            />
+          </div>
+          <Button
+            type="submit"
+            disabled={loading}
+            className="w-full rounded-xl font-semibold"
+            style={{ backgroundColor: "var(--accent-1)", color: "white" }}
+          >
+            {loading ? "绑定中..." : "确认绑定"}
+          </Button>
+        </form>
+      </div>
+    </div>
+  )
+}

@@ -1,0 +1,413 @@
+drop database if exists yunfu;
+create database yunfu;
+use yunfu;
+
+-- 1. 用户表
+CREATE TABLE user (
+                      user_id INT PRIMARY KEY AUTO_INCREMENT NOT NULL,
+                      username VARCHAR(255) NOT NULL,
+                      password_hash VARCHAR(255) NOT NULL COMMENT '存储加密后的密码',
+                      avatar_url TEXT NULL,
+                      email VARCHAR(100) NULL COMMENT '用户邮箱，用于找回密码和接收消息',
+                      last_menstrual_date DATE NULL COMMENT '末次月经日，用于计算孕周',
+                      pregnancy_time DATETIME NULL COMMENT '预产期，家庭成员可为空',
+                      created_at DATETIME DEFAULT NOW(),
+                      updated_at DATETIME DEFAULT NOW() ON UPDATE NOW(),
+                      share_scope VARCHAR(20) NULL DEFAULT 'all' COMMENT 'all|letters|photos',
+                      user_type VARCHAR(20) NULL DEFAULT 'pregnant' COMMENT 'pregnant|family_member',
+                      default_relationship VARCHAR(50) NULL COMMENT '注册时选择的关系，如配偶、婆婆、妈妈',
+                      data_collection_enabled TINYINT(1) DEFAULT 0 COMMENT '是否允许匿名数据收集 0=否 1=是'
+);
+
+-- 2. 备忘录主表
+CREATE TABLE memo (
+                      memo_id INT PRIMARY KEY AUTO_INCREMENT NOT NULL,
+                      user_id INT NOT NULL,
+                      type ENUM('text','voice','photo','file') NOT NULL DEFAULT 'text',
+                      photo_title VARCHAR(255) NULL,
+                      photo_description TEXT NULL,
+                      pregnancy_week VARCHAR(255) NULL,
+                      pregnancy_week_index INT NULL COMMENT '孕周索引（整数）',
+                      record_weight_kg DECIMAL(5,2) NULL COMMENT '记录时体重快照(kg)',
+                      tag VARCHAR(50) NULL COMMENT '如 letter_to_baby',
+                      mood VARCHAR(20) NULL COMMENT '记录心情',
+                      visibility_mode VARCHAR(20) DEFAULT 'all' COMMENT 'all|allowlist|blocklist',
+                      visible_to TEXT NULL COMMENT '可见范围，逗号分隔',
+                      category VARCHAR(200) NULL COMMENT 'AI 标签，≤6字/标签，逗号分隔',
+                      created_at DATETIME DEFAULT NOW(),
+                      updated_at DATETIME DEFAULT NOW() ON UPDATE NOW(),
+                      FOREIGN KEY (user_id) REFERENCES user(user_id) ON DELETE CASCADE
+);
+
+-- 3. 文字记录
+CREATE TABLE text (
+                      text_id INT PRIMARY KEY AUTO_INCREMENT NOT NULL,
+                      memo_id INT NOT NULL,
+                      title VARCHAR(255) NOT NULL,
+                      content TEXT NOT NULL,
+                      created_at DATETIME DEFAULT NOW(),
+                      updated_at DATETIME DEFAULT NOW() ON UPDATE NOW(),
+                      FOREIGN KEY (memo_id) REFERENCES memo(memo_id) ON DELETE CASCADE
+);
+
+-- 4. 语音记录
+CREATE TABLE voice (
+                       voice_id INT PRIMARY KEY AUTO_INCREMENT NOT NULL,
+                       memo_id INT NOT NULL,
+                       title VARCHAR(255) NOT NULL,
+                       url TEXT NOT NULL,
+                       text_content TEXT NULL COMMENT '语音转文字',
+                       created_at DATETIME DEFAULT NOW(),
+                       updated_at DATETIME DEFAULT NOW() ON UPDATE NOW(),
+                       FOREIGN KEY (memo_id) REFERENCES memo(memo_id) ON DELETE CASCADE
+);
+
+-- 5. 文件记录
+CREATE TABLE file (
+                      file_id INT PRIMARY KEY AUTO_INCREMENT NOT NULL,
+                      memo_id INT NOT NULL,
+                      title VARCHAR(255) NOT NULL,
+                      url TEXT NOT NULL,
+                      created_at DATETIME DEFAULT NOW(),
+                      updated_at DATETIME DEFAULT NOW() ON UPDATE NOW(),
+                      FOREIGN KEY (memo_id) REFERENCES memo(memo_id) ON DELETE CASCADE
+);
+
+-- 6. 照片记录
+CREATE TABLE photo (
+                       photo_id INT PRIMARY KEY AUTO_INCREMENT NOT NULL,
+                       memo_id INT NOT NULL,
+                       url TEXT NULL,
+                       created_at DATETIME DEFAULT NOW(),
+                       updated_at DATETIME DEFAULT NOW() ON UPDATE NOW(),
+                       FOREIGN KEY (memo_id) REFERENCES memo(memo_id) ON DELETE CASCADE
+);
+
+-- 7. 照片-备忘录关联表
+CREATE TABLE memo_photo (
+                            memo_photo_id INT PRIMARY KEY AUTO_INCREMENT NOT NULL,
+                            memo_id INT NOT NULL,
+                            photo_id INT NOT NULL,
+                            created_at DATETIME DEFAULT NOW(),
+                            updated_at DATETIME DEFAULT NOW() ON UPDATE NOW(),
+                            FOREIGN KEY (memo_id) REFERENCES memo(memo_id) ON DELETE CASCADE,
+                            FOREIGN KEY (photo_id) REFERENCES photo(photo_id) ON DELETE CASCADE
+);
+
+-- 8. AI 对话会话表
+CREATE TABLE conversation (
+                              conversation_id INT NOT NULL PRIMARY KEY AUTO_INCREMENT,
+                              user_id INT NOT NULL,
+                              memo_id INT NULL COMMENT '关联记录，纯 AI 对话可为空',
+                              title VARCHAR(255) NOT NULL,
+                              created_at DATETIME DEFAULT NOW(),
+                              updated_at DATETIME DEFAULT NOW() ON UPDATE NOW(),
+                              FOREIGN KEY (user_id) REFERENCES user(user_id) ON DELETE CASCADE
+);
+
+-- 9. AI 对话消息表
+CREATE TABLE message (
+                         message_id INT NOT NULL PRIMARY KEY AUTO_INCREMENT,
+                         conversation_id INT NOT NULL,
+                         user_id INT NOT NULL,
+                         content LONGTEXT NOT NULL,
+                         is_ai TINYINT(1) DEFAULT 0,
+                         created_at DATETIME DEFAULT NOW(),
+                         updated_at DATETIME DEFAULT NOW() ON UPDATE NOW(),
+                         FOREIGN KEY (conversation_id) REFERENCES conversation(conversation_id) ON DELETE CASCADE,
+                         FOREIGN KEY (user_id) REFERENCES user(user_id) ON DELETE CASCADE
+);
+
+-- 10. 用户每日日志（胎动、心情、体重、健康值）
+CREATE TABLE user_daily_log (
+                                log_id INT PRIMARY KEY AUTO_INCREMENT NOT NULL,
+                                user_id INT NOT NULL,
+                                record_date DATE NOT NULL,
+                                kick_count INT DEFAULT 0,
+                                mood VARCHAR(20) NULL,
+                                weight_kg DECIMAL(5,2) NULL,
+                                health_value TINYINT NULL COMMENT '健康值 0-100',
+                                created_at DATETIME DEFAULT NOW(),
+                                updated_at DATETIME DEFAULT NOW() ON UPDATE NOW(),
+                                FOREIGN KEY (user_id) REFERENCES user(user_id) ON DELETE CASCADE,
+                                UNIQUE KEY uk_user_date (user_id, record_date)
+);
+
+-- 11. 产检清单勾选（可选）
+CREATE TABLE prenatal_checklist (
+                                    checklist_id INT PRIMARY KEY AUTO_INCREMENT NOT NULL,
+                                    user_id INT NOT NULL,
+                                    milestone_key VARCHAR(50) NOT NULL,
+                                    completed TINYINT(1) DEFAULT 0,
+                                    completed_at DATETIME NULL,
+                                    created_at DATETIME DEFAULT NOW(),
+                                    updated_at DATETIME DEFAULT NOW() ON UPDATE NOW(),
+                                    FOREIGN KEY (user_id) REFERENCES user(user_id) ON DELETE CASCADE,
+                                    UNIQUE KEY uk_user_milestone (user_id, milestone_key)
+);
+
+-- 12. 宫缩记录
+CREATE TABLE contraction (
+                             contraction_id INT PRIMARY KEY AUTO_INCREMENT NOT NULL,
+                             user_id INT NOT NULL,
+                             started_at DATETIME NOT NULL,
+                             duration_seconds INT NOT NULL,
+                             created_at DATETIME DEFAULT NOW(),
+                             FOREIGN KEY (user_id) REFERENCES user(user_id) ON DELETE CASCADE
+);
+
+-- 13. 家庭表
+CREATE TABLE family (
+                        family_id INT PRIMARY KEY AUTO_INCREMENT NOT NULL,
+                        creator_user_id INT NOT NULL,
+                        invite_code VARCHAR(10) NOT NULL,
+                        invite_expires_at DATETIME NOT NULL,
+                        created_at DATETIME DEFAULT NOW(),
+                        updated_at DATETIME DEFAULT NOW() ON UPDATE NOW(),
+                        FOREIGN KEY (creator_user_id) REFERENCES user(user_id) ON DELETE CASCADE
+);
+
+-- 14. 家庭成员表
+CREATE TABLE family_member (
+                               member_id INT PRIMARY KEY AUTO_INCREMENT NOT NULL,
+                               family_id INT NOT NULL,
+                               user_id INT NOT NULL,
+                               role VARCHAR(20) NOT NULL DEFAULT 'member' COMMENT 'creator|member',
+                               relationship VARCHAR(50) NULL COMMENT '与孕妇关系，如老公、婆婆、妈妈',
+                               is_spouse TINYINT(1) NULL DEFAULT 0 COMMENT '是否配偶，可异步 LLM 判断',
+                               joined_at DATETIME DEFAULT NOW(),
+                               FOREIGN KEY (family_id) REFERENCES family(family_id) ON DELETE CASCADE,
+                               FOREIGN KEY (user_id) REFERENCES user(user_id) ON DELETE CASCADE,
+                               UNIQUE KEY uk_family_user (family_id, user_id)
+);
+
+-- 15. 记录评论表
+CREATE TABLE record_comment (
+                                comment_id INT PRIMARY KEY AUTO_INCREMENT NOT NULL,
+                                memo_id INT NOT NULL,
+                                parent_comment_id INT NULL,
+                                user_id INT NOT NULL,
+                                content TEXT NOT NULL,
+                                created_at DATETIME DEFAULT NOW(),
+                                FOREIGN KEY (memo_id) REFERENCES memo(memo_id) ON DELETE CASCADE,
+                                FOREIGN KEY (user_id) REFERENCES user(user_id) ON DELETE CASCADE
+);
+
+-- 16. 记录点赞表
+CREATE TABLE record_like (
+                             like_id INT PRIMARY KEY AUTO_INCREMENT NOT NULL,
+                             memo_id INT NOT NULL,
+                             user_id INT NOT NULL,
+                             created_at DATETIME DEFAULT NOW(),
+                             FOREIGN KEY (memo_id) REFERENCES memo(memo_id) ON DELETE CASCADE,
+                             FOREIGN KEY (user_id) REFERENCES user(user_id) ON DELETE CASCADE,
+                             UNIQUE KEY uk_memo_user (memo_id, user_id)
+);
+
+-- 17. 记录评论点赞表
+CREATE TABLE record_comment_like (
+                                     like_id INT PRIMARY KEY AUTO_INCREMENT NOT NULL,
+                                     comment_id INT NOT NULL,
+                                     user_id INT NOT NULL,
+                                     created_at DATETIME DEFAULT NOW(),
+                                     UNIQUE KEY uk_comment_user (comment_id, user_id),
+                                     FOREIGN KEY (comment_id) REFERENCES record_comment(comment_id) ON DELETE CASCADE,
+                                     FOREIGN KEY (user_id) REFERENCES user(user_id) ON DELETE CASCADE
+);
+
+-- 18. 目标模板表
+CREATE TABLE pregnancy_goal_template (
+                                         template_id INT PRIMARY KEY AUTO_INCREMENT NOT NULL,
+                                         category VARCHAR(20) NOT NULL COMMENT 'record|behavior|milestone',
+                                         track_key VARCHAR(50) NOT NULL,
+                                         name VARCHAR(100) NOT NULL,
+                                         description VARCHAR(255) NULL,
+                                         target_value INT NOT NULL DEFAULT 1,
+                                         unit VARCHAR(20) NULL COMMENT '条|天|次|封|张',
+                                         points INT NOT NULL DEFAULT 0,
+                                         sort_order INT NOT NULL DEFAULT 0,
+                                         created_at DATETIME DEFAULT NOW(),
+                                         updated_at DATETIME DEFAULT NOW() ON UPDATE NOW()
+);
+
+-- 19. 用户目标进度表
+CREATE TABLE user_goal_progress (
+                                    progress_id INT PRIMARY KEY AUTO_INCREMENT NOT NULL,
+                                    user_id INT NOT NULL,
+                                    template_id INT NOT NULL,
+                                    current_value INT NOT NULL DEFAULT 0,
+                                    status VARCHAR(20) NOT NULL DEFAULT 'active' COMMENT 'active|completed',
+                                    completed_at DATETIME NULL,
+                                    created_at DATETIME DEFAULT NOW(),
+                                    updated_at DATETIME DEFAULT NOW() ON UPDATE NOW(),
+                                    FOREIGN KEY (user_id) REFERENCES user(user_id) ON DELETE CASCADE,
+                                    FOREIGN KEY (template_id) REFERENCES pregnancy_goal_template(template_id) ON DELETE CASCADE,
+                                    UNIQUE KEY uk_user_template (user_id, template_id)
+);
+
+-- 20. 用户成就表
+CREATE TABLE user_achievements (
+                                   achievement_id INT PRIMARY KEY AUTO_INCREMENT NOT NULL,
+                                   user_id INT NOT NULL,
+                                   badge_key VARCHAR(50) NOT NULL,
+                                   badge_name VARCHAR(100) NOT NULL,
+                                   earned_at DATETIME DEFAULT NOW(),
+                                   FOREIGN KEY (user_id) REFERENCES user(user_id) ON DELETE CASCADE
+);
+
+-- 21. AI 图生图模板表
+CREATE TABLE ai_template (
+                             template_id INT PRIMARY KEY AUTO_INCREMENT NOT NULL,
+                             user_id INT NOT NULL,
+                             title VARCHAR(120) NOT NULL,
+                             prompt_text TEXT NOT NULL,
+                             category VARCHAR(50) NULL,
+                             cover_image_url TEXT NULL,
+                             is_public TINYINT(1) NOT NULL DEFAULT 0,
+                             usage_count INT NOT NULL DEFAULT 0,
+                             created_at DATETIME DEFAULT NOW(),
+                             updated_at DATETIME DEFAULT NOW() ON UPDATE NOW(),
+                             FOREIGN KEY (user_id) REFERENCES user(user_id) ON DELETE CASCADE
+);
+
+-- 22. AI 图生图作品表
+CREATE TABLE ai_generation_post (
+                                    post_id INT PRIMARY KEY AUTO_INCREMENT NOT NULL,
+                                    user_id INT NOT NULL,
+                                    template_id INT NULL,
+                                    input_image_url TEXT NOT NULL,
+                                    output_image_url TEXT NOT NULL,
+                                    prompt_text TEXT NOT NULL,
+                                    is_public TINYINT(1) NOT NULL DEFAULT 0,
+                                    created_at DATETIME DEFAULT NOW(),
+                                    updated_at DATETIME DEFAULT NOW() ON UPDATE NOW(),
+                                    FOREIGN KEY (user_id) REFERENCES user(user_id) ON DELETE CASCADE,
+                                    FOREIGN KEY (template_id) REFERENCES ai_template(template_id) ON DELETE SET NULL
+);
+
+-- 23. AI 作品点赞表
+CREATE TABLE ai_generation_post_like (
+                                         like_id INT PRIMARY KEY AUTO_INCREMENT NOT NULL,
+                                         post_id INT NOT NULL,
+                                         user_id INT NOT NULL,
+                                         created_at DATETIME DEFAULT NOW(),
+                                         updated_at DATETIME DEFAULT NOW() ON UPDATE NOW(),
+                                         UNIQUE KEY uk_post_user_like (post_id, user_id),
+                                         FOREIGN KEY (post_id) REFERENCES ai_generation_post(post_id) ON DELETE CASCADE,
+                                         FOREIGN KEY (user_id) REFERENCES user(user_id) ON DELETE CASCADE
+);
+
+-- 24. AI 作品评论表
+CREATE TABLE ai_generation_post_comment (
+                                            comment_id INT PRIMARY KEY AUTO_INCREMENT NOT NULL,
+                                            post_id INT NOT NULL,
+                                            parent_comment_id INT NULL,
+                                            user_id INT NOT NULL,
+                                            content TEXT NOT NULL,
+                                            created_at DATETIME DEFAULT NOW(),
+                                            updated_at DATETIME DEFAULT NOW() ON UPDATE NOW(),
+                                            FOREIGN KEY (post_id) REFERENCES ai_generation_post(post_id) ON DELETE CASCADE,
+                                            FOREIGN KEY (user_id) REFERENCES user(user_id) ON DELETE CASCADE
+);
+
+-- 25. AI 作品评论点赞表
+CREATE TABLE ai_generation_post_comment_like (
+                                                 like_id INT PRIMARY KEY AUTO_INCREMENT NOT NULL,
+                                                 comment_id INT NOT NULL,
+                                                 user_id INT NOT NULL,
+                                                 created_at DATETIME DEFAULT NOW(),
+                                                 UNIQUE KEY uk_comment_user (comment_id, user_id),
+                                                 FOREIGN KEY (comment_id) REFERENCES ai_generation_post_comment(comment_id) ON DELETE CASCADE,
+                                                 FOREIGN KEY (user_id) REFERENCES user(user_id) ON DELETE CASCADE
+);
+
+-- 26. 产检检查单表
+CREATE TABLE check_report (
+                              report_id INT PRIMARY KEY AUTO_INCREMENT NOT NULL,
+                              user_id INT NOT NULL,
+                              file_url TEXT NOT NULL,
+                              original_filename VARCHAR(255) NULL,
+                              parsed_summary TEXT NULL,
+                              next_check_date DATE NULL,
+                              email_sent TINYINT(1) NOT NULL DEFAULT 0,
+                              last_send_at DATETIME NULL,
+                              send_status VARCHAR(30) NULL COMMENT 'pending|sent|failed',
+                              retry_count INT NOT NULL DEFAULT 0,
+                              created_at DATETIME DEFAULT NOW(),
+                              updated_at DATETIME DEFAULT NOW() ON UPDATE NOW(),
+                              FOREIGN KEY (user_id) REFERENCES user(user_id) ON DELETE CASCADE
+);
+
+-- 27. 提示词模板表
+CREATE TABLE prompt_template (
+                                 id INT PRIMARY KEY AUTO_INCREMENT NOT NULL,
+                                 `key` VARCHAR(100) NOT NULL COMMENT '如 ai_chat_system',
+                                 model_type VARCHAR(50) NOT NULL DEFAULT 'default',
+                                 system_prompt TEXT NULL,
+                                 user_prompt_template TEXT NULL COMMENT '支持 {placeholder}',
+                                 created_at DATETIME DEFAULT NOW(),
+                                 UNIQUE KEY uk_key_model (`key`, model_type)
+);
+
+-- 28. 健康科普文章表
+CREATE TABLE article (
+                         article_id INT PRIMARY KEY AUTO_INCREMENT NOT NULL,
+                         title VARCHAR(200) NOT NULL,
+                         summary VARCHAR(500) NULL,
+                         content LONGTEXT NULL,
+                         cover_url VARCHAR(500) NULL,
+                         category VARCHAR(50) NULL,
+                         sort_order INT DEFAULT 0,
+                         is_published TINYINT(1) DEFAULT 1,
+                         audience VARCHAR(20) NULL DEFAULT 'all' COMMENT 'all|pregnant|spouse',
+                         created_at DATETIME DEFAULT NOW(),
+                         updated_at DATETIME DEFAULT NOW() ON UPDATE NOW()
+);
+
+-- 29. 站内通知表
+CREATE TABLE user_notification (
+                                   id INT AUTO_INCREMENT PRIMARY KEY NOT NULL,
+                                   user_id INT NOT NULL,
+                                   type VARCHAR(32) NOT NULL DEFAULT 'system' COMMENT 'task_assigned|system',
+                                   title VARCHAR(200) NOT NULL,
+                                   body TEXT NULL,
+                                   related_task_id INT NULL,
+                                   read_at DATETIME NULL,
+                                   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                                   INDEX idx_user_read (user_id, read_at),
+                                   INDEX idx_user_created (user_id, created_at)
+);
+
+-- 30. 家庭任务表（爸爸成长营）
+CREATE TABLE family_task (
+                             id INT AUTO_INCREMENT PRIMARY KEY NOT NULL,
+                             family_id INT NOT NULL,
+                             assignee_user_id INT NOT NULL COMMENT '执行人',
+                             title VARCHAR(200) NOT NULL,
+                             description TEXT NULL,
+                             task_type VARCHAR(32) NOT NULL DEFAULT 'routine' COMMENT 'routine|emotion',
+                             pregnancy_week INT NULL,
+                             due_date DATE NULL,
+                             status VARCHAR(20) NOT NULL DEFAULT 'pending' COMMENT 'pending|completed',
+                             completed_at DATETIME NULL,
+                             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                             INDEX idx_family (family_id),
+                             INDEX idx_assignee (assignee_user_id),
+                             INDEX idx_assignee_status (assignee_user_id, status)
+);
+
+-- 31. 定时提醒/任务表
+CREATE TABLE scheduled_operation (
+                                     id INT PRIMARY KEY AUTO_INCREMENT NOT NULL,
+                                     user_id INT NOT NULL,
+                                     content VARCHAR(500) NOT NULL COMMENT '提醒内容',
+                                     schedule_type VARCHAR(20) NOT NULL DEFAULT 'once' COMMENT 'daily|once',
+                                     run_at DATETIME NULL COMMENT 'once 时执行时间',
+                                     run_time VARCHAR(10) NULL COMMENT 'daily 时每日 HH:mm',
+                                     next_run_at DATETIME NULL COMMENT '下次执行时间',
+                                     status VARCHAR(20) NOT NULL DEFAULT 'pending' COMMENT 'pending|done|cancelled',
+                                     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                                     FOREIGN KEY (user_id) REFERENCES user(user_id) ON DELETE CASCADE,
+                                     INDEX idx_user_next (user_id, next_run_at),
+                                     INDEX idx_next_status (next_run_at, status)
+);

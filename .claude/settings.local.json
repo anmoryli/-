@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls -la /d/Code/Project/Merge/yunqibao/frontend/app/\\\\\\(app\\\\\\))",
+      "Bash(ls -la \"/d/Code/Project/Merge/yunqibao/frontend/app/\\(app\\)/records\")",
+      "Bash(ls -la \"/d/Code/Project/Merge/yunqibao/frontend/app/\\(app\\)/timeline\")"
+    ]
+  }
+}
