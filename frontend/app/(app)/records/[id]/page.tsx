@@ -8,7 +8,7 @@ import { format } from "date-fns"
 import { zhCN } from "date-fns/locale"
 import { ArrowLeft, Image, Mic, FileText, Download, Pencil, Users, Sparkles } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
-import { getAllEnriched, beautifyPreview, updateText, type MemoItem } from "@/lib/api/memo"
+import { getAllEnriched, getFamilyEnriched, beautifyPreview, updateText, type MemoItem } from "@/lib/api/memo"
 import { getMyFamily } from "@/lib/api/family"
 import { MarkdownView } from "@/components/markdown-view"
 import { PhotoCarousel } from "@/components/photo-carousel"
@@ -80,14 +80,17 @@ export default function RecordDetailPage() {
     if (!user || !id) return
     setLoading(true)
     try {
-      let targetUserId = user.userId
+      let list: MemoItem[]
       if (user.userType === "family_member") {
         const family = await getMyFamily(user.userId)
         if (family) {
-          targetUserId = family.creatorUserId
+          list = await getFamilyEnriched(user.userId)
+        } else {
+          list = await getAllEnriched(user.userId, user.userId)
         }
+      } else {
+        list = await getAllEnriched(user.userId, user.userId)
       }
-      const list = await getAllEnriched(targetUserId, user.userId)
       const found = list.find((r) => String(r.id) === id)
       setRecord(found ?? null)
     } catch {

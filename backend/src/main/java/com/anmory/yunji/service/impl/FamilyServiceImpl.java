@@ -6,6 +6,7 @@ import com.anmory.yunji.entity.User;
 import com.anmory.yunji.exception.BusinessException;
 import com.anmory.yunji.mapper.FamilyMapper;
 import com.anmory.yunji.mapper.FamilyMemberMapper;
+import com.anmory.yunji.mapper.MemoMapper;
 import com.anmory.yunji.service.FamilyService;
 import com.anmory.yunji.service.SpouseDetectionService;
 import com.anmory.yunji.service.UserService;
@@ -24,6 +25,7 @@ public class FamilyServiceImpl implements FamilyService {
 
     private final FamilyMapper familyMapper;
     private final FamilyMemberMapper familyMemberMapper;
+    private final MemoMapper memoMapper;
     private final UserService userService;
     private final SpouseDetectionService spouseDetectionService;
 
@@ -124,6 +126,22 @@ public class FamilyServiceImpl implements FamilyService {
         FamilyMember membership = getPrimaryMembership(userId);
         if (membership == null) return null;
         return familyMapper.selectById(membership.getFamilyId());
+    }
+
+    @Override
+    public Map<String, Object> getCreatorPregnancyInfo(Integer memberUserId) {
+        Family family = getMyFamily(memberUserId);
+        if (family == null || family.getCreatorUserId() == null) return null;
+        Integer creatorId = family.getCreatorUserId();
+        User creator = userService.getById(creatorId);
+        if (creator == null) return null;
+        Map<String, Object> out = new HashMap<>();
+        out.put("creatorUserId", creatorId);
+        out.put("creatorUsername", creator.getUsername());
+        out.put("lastMenstrualDate", creator.getLastMenstrualDate() != null ? creator.getLastMenstrualDate().toString() : null);
+        out.put("pregnancyTime", creator.getPregnancyTime() != null ? creator.getPregnancyTime().toString() : null);
+        out.put("recordCount", memoMapper.countByUserId(creatorId));
+        return out;
     }
 
     @Override

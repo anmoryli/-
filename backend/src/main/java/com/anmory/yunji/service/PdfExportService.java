@@ -35,4 +35,9 @@ public interface PdfExportService {
      * 将合并后的记录列表导出为 PDF（用于已有数据直接导出）
      */
     void exportToPdf(List<EnrichedMemoItem> items, String username, OutputStream output);
+
+    /**
+     * 加载指定用户的记录并转为 EnrichedMemoItem 列表（用于按 scope 导出）
+     */
+    List<EnrichedMemoItem> loadEnrichedItems(Integer userId);
 }

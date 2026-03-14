@@ -1,9 +1,11 @@
 package com.anmory.yunji.service.impl;
 
+import com.anmory.yunji.entity.Family;
 import com.anmory.yunji.entity.Memo;
 import com.anmory.yunji.entity.Text;
 import com.anmory.yunji.mapper.MemoMapper;
 import com.anmory.yunji.mapper.TextMapper;
+import com.anmory.yunji.service.FamilyService;
 import com.anmory.yunji.service.MemoAiEnrichmentService;
 import com.anmory.yunji.service.PromptService;
 import lombok.RequiredArgsConstructor;
@@ -12,6 +14,7 @@ import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.Map;
 
 @Slf4j
@@ -23,6 +26,7 @@ public class MemoAiEnrichmentServiceImpl implements MemoAiEnrichmentService {
     private final MemoMapper memoMapper;
     private final ChatClient chatClient;
     private final PromptService promptService;
+    private final FamilyService familyService;
 
     private static final String PLACEHOLDER_TITLE = "记录";
 
@@ -42,7 +46,8 @@ public class MemoAiEnrichmentServiceImpl implements MemoAiEnrichmentService {
             }
 
             if (needsTitle) {
-                String title = generateTitle(content);
+                Integer recordOwnerId = memo != null ? memo.getUserId() : null;
+                String title = generateTitle(content, recordOwnerId);
                 if (title != null && !title.isBlank()) {
                     text.setTitle(title);
                     textMapper.updateById(text);
@@ -51,7 +56,7 @@ public class MemoAiEnrichmentServiceImpl implements MemoAiEnrichmentService {
             }
 
             if (needsCategory && memo != null) {
-                String category = generateCategory(content);
+                String category = generateCategory(content, memo.getUserId());
                 if (category != null && !category.isBlank()) {
                     memoMapper.updateCategory(memoId, category);
                     log.info("AI 分类已更新 memoId={} category={}", memoId, category);
@@ -69,9 +74,18 @@ public class MemoAiEnrichmentServiceImpl implements MemoAiEnrichmentService {
         return truncated.equals(title) || (content.length() > 20 && title.startsWith(content.substring(0, Math.min(20, content.length()))));
     }
 
-    private String generateTitle(String content) {
+    private boolean isSpouseUser(Integer userId) {
+        if (userId == null) return false;
+        Family f = familyService.getMyFamily(userId);
+        if (f == null || f.getCreatorUserId() == null) return false;
+        List<Integer> spouseIds = familyService.getSpouseUserIds(f.getCreatorUserId());
+        return spouseIds != null && spouseIds.contains(userId);
+    }
+
+    private String generateTitle(String content, Integer recordOwnerUserId) {
         try {
-            String promptStr = promptService.getUserPrompt("memo_text_title", "default", Map.of("content", content));
+            String key = (recordOwnerUserId != null && isSpouseUser(recordOwnerUserId)) ? "memo_text_title_dad" : "memo_text_title";
+            String promptStr = promptService.getUserPrompt(key, "default", Map.of("content", content));
             if (promptStr == null || promptStr.isBlank()) {
                 promptStr = "请为以下孕期记录生成一个简洁的标题（不超过20字）：" + content;
             }
@@ -86,9 +100,10 @@ public class MemoAiEnrichmentServiceImpl implements MemoAiEnrichmentService {
     private static final String DEFAULT_CATEGORY = "日记";
     private static final String[] FORBIDDEN_CATEGORY_PHRASES = {"信息不足", "无法分类", "无法判断"};
 
-    private String generateCategory(String content) {
+    private String generateCategory(String content, Integer recordOwnerUserId) {
         try {
-            String promptStr = promptService.getUserPrompt("memo_category_tag", "default", Map.of("content", content));
+            String key = (recordOwnerUserId != null && isSpouseUser(recordOwnerUserId)) ? "memo_category_tag_dad" : "memo_category_tag";
+            String promptStr = promptService.getUserPrompt(key, "default", Map.of("content", content));
             if (promptStr == null || promptStr.isBlank()) return DEFAULT_CATEGORY;
             String result = chatClient.prompt().user(promptStr).call().content();
             return normalizeCategory(result);

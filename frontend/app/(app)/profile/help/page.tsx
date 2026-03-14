@@ -147,7 +147,7 @@ export default function HelpPage() {
           <div className="overflow-hidden rounded-2xl bg-card">
             <button
               onClick={() => {
-                navigator.clipboard.writeText("support@yunqibao.com")
+                navigator.clipboard.writeText("anmory@qq.com")
                 toast.success("邮箱已复制到剪贴板")
               }}
               className="flex w-full items-center gap-3 px-4 py-4 text-left transition-colors active:bg-secondary"
@@ -158,7 +158,7 @@ export default function HelpPage() {
               <div className="flex-1">
                 <p className="text-sm font-medium text-foreground">客服邮箱</p>
                 <p className="mt-0.5 text-xs text-muted-foreground">
-                  support@yunqibao.com
+                  anmory@qq.com
                 </p>
               </div>
             </button>

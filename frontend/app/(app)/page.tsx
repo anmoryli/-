@@ -7,14 +7,17 @@ import { QuickActions } from "@/components/home/quick-actions"
 import { RecentRecords } from "@/components/home/recent-records"
 import { RecordStats } from "@/components/home/record-stats"
 import { TrendChart } from "@/components/home/trend-chart"
+import { WeightChart } from "@/components/home/weight-chart"
+import { MoodChart } from "@/components/home/mood-chart"
 import { KickCounter } from "@/components/home/kick-counter"
 import { MoodPicker } from "@/components/home/mood-picker"
 import { WeightRecorder } from "@/components/home/weight-recorder"
 import { ContractionTimer } from "@/components/home/contraction-timer"
 import { ShareCard } from "@/components/home/share-card"
 import { GoalWidget } from "@/components/home/goal-widget"
+import { TimeCapsule } from "@/components/home/time-capsule"
 import { useAuth } from "@/lib/auth-context"
-import { getAllEnriched, type MemoItem } from "@/lib/api/memo"
+import { getAllEnriched, getFamilyEnriched, type MemoItem } from "@/lib/api/memo"
 import { getPregnancyInfo, getWeeklyTip, getDailyWarmth } from "@/lib/pregnancy"
 import { toast } from "sonner"
 import { format } from "date-fns"
@@ -32,10 +35,17 @@ export default function HomePage() {
   useEffect(() => {
     if (!user) return
     setLoading(true)
-    getAllEnriched(user.userId)
-      .then((data) => setRecords(data || []))
-      .catch(() => setRecords([]))
-      .finally(() => setLoading(false))
+    if (user.userType === "family_member") {
+      getFamilyEnriched(user.userId)
+        .then((data) => setRecords(data || []))
+        .catch(() => setRecords([]))
+        .finally(() => setLoading(false))
+    } else {
+      getAllEnriched(user.userId)
+        .then((data) => setRecords(data || []))
+        .catch(() => setRecords([]))
+        .finally(() => setLoading(false))
+    }
   }, [user])
 
   useEffect(() => {
@@ -115,6 +125,13 @@ export default function HomePage() {
         />
       )}
 
+      {/* 时光胶囊：随机掉落小惊喜 — 仅孕妇本人，放在孕期小目标上方 */}
+      {isPregnant && records.length > 0 && (
+        <section>
+          <TimeCapsule records={records} userId={user.userId} />
+        </section>
+      )}
+
       {/* 孕期小目标 — 仅孕妇本人 */}
       {isPregnant && (
         <section>
@@ -122,11 +139,13 @@ export default function HomePage() {
         </section>
       )}
 
-      {/* 记录回顾、本周小结、时光轴、胎动心情趋势 — 仅孕妇本人 */}
+      {/* 记录回顾、本周小结、时光轴、胎动心情趋势与数据可视化 — 仅孕妇本人 */}
       {isPregnant && (
         <section className="space-y-4">
           {records.length > 0 && <RecordStats records={records} />}
           <TrendChart userId={user.userId} />
+          <WeightChart userId={user.userId} days={30} />
+          <MoodChart userId={user.userId} days={7} />
         </section>
       )}
 
@@ -180,17 +199,7 @@ export default function HomePage() {
         <h2 className="mb-4 text-[13px] font-semibold uppercase tracking-wider text-[var(--foreground-muted)]">
           最近记录
         </h2>
-        {isPregnant ? (
-          <RecentRecords records={records} loading={loading} />
-        ) : (
-          <Link
-            href="/family"
-            className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-[var(--card-border)] bg-[var(--card)] py-12 text-[var(--foreground-muted)]"
-          >
-            <span className="text-sm">前往家人共享查看家人记录</span>
-            <span className="text-[13px] font-medium text-[var(--accent-1)]">进入家人共享</span>
-          </Link>
-        )}
+        <RecentRecords records={records} loading={loading} />
       </section>
     </div>
   )

@@ -162,7 +162,8 @@ public class PdfExportServiceImpl implements PdfExportService {
         }
     }
 
-    private List<EnrichedMemoItem> loadEnrichedItems(Integer userId) {
+    @Override
+    public List<EnrichedMemoItem> loadEnrichedItems(Integer userId) {
         List<Memo> memos = memoService.getAllMemoByUserId(userId);
         List<Text> texts = memoService.getTextByUserId(userId);
         List<Voice> voices = memoService.getVoiceByUserId(userId);
@@ -415,7 +416,8 @@ public class PdfExportServiceImpl implements PdfExportService {
 
         Paragraph header = new Paragraph();
         header.add(new Chunk("◆ ", new Font(fontTitle.getBaseFont(), 12, Font.NORMAL, new Color(227, 184, 176))));
-        header.add(new Chunk("【" + index + "】 " + typeLabel + "  ", fontTitle));
+        String recordByLabel = "mom".equals(item.getRecordBy()) ? "妈妈 " : "dad".equals(item.getRecordBy()) ? "爸爸 " : "";
+        header.add(new Chunk("【" + index + "】 " + recordByLabel + typeLabel + "  ", fontTitle));
         if (item.getCreatedAt() != null) {
             header.add(new Chunk(item.getCreatedAt().format(DF) + "  ", fontCaption));
         }

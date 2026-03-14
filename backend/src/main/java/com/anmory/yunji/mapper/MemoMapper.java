@@ -283,4 +283,7 @@ public interface MemoMapper {
 
     @Select("SELECT DISTINCT DATE(created_at) FROM yunfu.memo WHERE user_id = #{userId} AND created_at >= #{from} ORDER BY DATE(created_at) DESC")
     List<LocalDate> selectDistinctRecordDates(@Param("userId") Integer userId, @Param("from") LocalDate from);
+
+    @Select("SELECT COUNT(*) FROM yunfu.memo WHERE user_id = #{userId}")
+    int countByUserId(@Param("userId") Integer userId);
 }

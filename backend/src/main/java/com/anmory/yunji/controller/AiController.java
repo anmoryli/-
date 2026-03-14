@@ -99,10 +99,29 @@ public class AiController {
 
     private static final Pattern DATA_IMAGE_PATTERN = Pattern.compile("data:image/([a-zA-Z0-9.+-]+);base64,([A-Za-z0-9+/=]+)");
     private static final String MODEL_TEXT_CHAT = "gpt-5.2";
-    private static final String MODEL_IMAGE = "gemini-2.5-flash-image";
+    private static final String MODEL_IMAGE = "gemini-3.1-flash-image-preview";
 
-    /** 配偶提及关键词（用户输入包含则触发邮件通知），与 FamilyServiceImpl.SPOUSE_KEYWORDS 保持一致 */
-    private static final String[] SPOUSE_MENTION_KEYWORDS = {"老公", "老婆", "丈夫", "配偶", "妻子"};
+    /**
+     * 配偶提及关键词（用户输入包含则触发邮件通知），与 FamilyServiceImpl.SPOUSE_KEYWORDS 保持一致
+     * 扩展说明：覆盖日常口语、正式称谓、不同地域习惯称呼，确保识别全面性
+     */
+    private static final String[] SPOUSE_MENTION_KEYWORDS = {
+            // 基础正式称谓
+            "老公", "老婆", "丈夫", "配偶", "妻子",
+            // 口语化/亲昵称呼
+            "先生", "太太", "爱人", "媳妇儿", "媳妇", "相公", "娘子",
+            // 地域特色称呼
+            "老公公", "老婆婆", // 部分北方地域口语
+            "老伴", "老伴儿",   // 中老年常用
+            "夫君", "夫人",     // 偏传统/书面
+            "另一半", "伴侣",   // 通用泛称
+            "媳妇子", "婆姨",   // 西北/山西等地域称呼
+            "堂客",             // 西南（如湖南）地域称呼
+            "内人", "拙荆",     // 传统谦称（男方称女方）
+            "外子",             // 传统谦称（女方称男方）
+            "老公婆",           // 部分南方地域口语
+            "爱人儿"            // 北方口语亲昵版
+    };
 
     private boolean mentionsSpouse(String text) {
         if (text == null || text.isBlank()) return false;
@@ -532,7 +551,7 @@ public class AiController {
             log.info("[RAG] 检索结果内容：\n{}", ragContext != null ? ragContext : "（空）");
             if (ragContext != null && !ragContext.isBlank() && !ragContext.contains("暂未找到") && !ragContext.contains("不可用") && !ragContext.contains("异常")) {
                 systemPrompt = systemPrompt + "\n\n参考以下相关内容（回答时可结合使用）：\n" + ragContext
-                        + "\n\n要求：1) 参考内容中的图片链接必须用 Markdown 图片语法输出，例如：![图片](图片URL) 或 ![描述](图片URL)，不要只输出裸链接，否则前端无法渲染。2) 文件链接用 Markdown 链接输出：[点击查看](文件URL)。3) 用户若在找/搜/查某类内容，请优先根据检索结果列出，图片一律用 ![描述](url) 格式。";
+                        + "\n\n要求：1) 仅当用户明确在找/要看/想查看照片、图片、图时，才在回复中用 Markdown 图片语法展示图片，例如：![图片](图片URL)。2) 若用户只是普通聊天、倾诉、问建议或问非图片类问题，不要主动插入图片链接或图片。3) 文件链接用 Markdown 链接输出：[点击查看](文件URL)。4) 用户若在找/搜/查某类内容，请优先根据检索结果用文字说明，仅在用户明确要看图时才输出图片。";
                 imageUrlsFromRag.addAll(extractImageUrlsFromRagContext(ragContext));
                 log.info("[RAG] 从检索结果中提取到图片 URL 数量：{}", imageUrlsFromRag.size());
             }
@@ -582,6 +601,12 @@ public class AiController {
                     // 无论流式成功还是异常结束，都执行：保存 AI 回复 + 配偶提及检测与邮件 + 追加提示并下发给前端
                     try {
                         String full = fullAnswer.toString();
+                        // 流式因异常结束（如 API EOF）且几乎无内容时，不追加 RAG 检索图，避免「图生图失败却展示检索图」的混淆
+                        if (reactor.core.publisher.SignalType.ON_ERROR.equals(signalType) && full.length() < 30) {
+                            if (full.isBlank()) {
+                                full = "生成出错，请重试。";
+                            }
+                        }
                         boolean mentionDetected = mentionsSpouse(safeQuestion);
                         log.info("[流式结束] userId={} conversationId={} chunkCount={} fullLen={} mentionsSpouse={}",
                                 userId, conversationId, chunkCount.get(), full.length(), mentionDetected);
@@ -650,13 +675,17 @@ public class AiController {
                                 log.info("[配偶提及] 当前用户非孕妇本人且无家庭创建者，不触发邮件 userId={}", userId);
                             }
                         }
-                        // RAG 检索到的图片 URL 强制追加为 Markdown 图片，确保前端能渲染（不依赖 AI 是否输出）
+                        // 仅当用户明确表达要看/找照片时才追加 RAG 图片，避免普通聊天也塞图
                         StringBuilder ragImageAppend = new StringBuilder();
-                        if (!imageUrlsFromRag.isEmpty()) {
+                        boolean streamFailed = reactor.core.publisher.SignalType.ON_ERROR.equals(signalType) && fullAnswer.length() < 30;
+                        boolean userAskedForPhotos = userWantsToSeePhotos(safeQuestion);
+                        if (!streamFailed && userAskedForPhotos && !imageUrlsFromRag.isEmpty()) {
                             for (String url : imageUrlsFromRag) {
                                 ragImageAppend.append("\n\n![图片](").append(url).append(")");
                             }
-                            log.info("[RAG] 向回复中追加 {} 张图片的 Markdown", imageUrlsFromRag.size());
+                            log.info("[RAG] 用户意图为查看照片，向回复中追加 {} 张图片的 Markdown", imageUrlsFromRag.size());
+                        } else if (!imageUrlsFromRag.isEmpty() && !userAskedForPhotos) {
+                            log.info("[RAG] 用户未表达要看照片，不追加图片（共 {} 张）", imageUrlsFromRag.size());
                         }
                         String finalMessage = full + ragImageAppend + appendText;
                         messageService.save(conversationId, userId, finalMessage, true);
@@ -822,6 +851,24 @@ public class AiController {
                 || lower.endsWith(".webp") || lower.contains(".webp?");
     }
 
+    /**
+     * 判断用户当前问题是否明确表达「要看/找/查/发 照片/图片」。
+     * 仅当意图清晰为查看照片时才在回复中强制追加 RAG 图片，避免普通聊天也塞图。
+     */
+    private boolean userWantsToSeePhotos(String question) {
+        if (question == null || question.isBlank()) return false;
+        String q = question.trim();
+        if (q.length() > 500) q = q.substring(0, 500);
+        String lower = q.replaceAll("\\s+", " ").toLowerCase();
+        // 明确要看/找/查/发/给我 图或照片
+        if (lower.matches(".*(找|搜|查|看|要|发|给我|有没有|展示|显示|调出|翻出).*(图|照片|图片|相片|照).*")) return true;
+        if (lower.matches(".*(图|照片|图片|相片|照).*(找|搜|查|看|要|发|给我|有没有|展示|显示|调出|翻出).*")) return true;
+        if (lower.matches(".*(看下|看看|想看|想找|想查|发一下|发给我|发我).*(图|照片|图片|相片).*")) return true;
+        if (lower.matches(".*(之前的|以前的|那天|那天拍的|记录里的).*(图|照片|图片).*")) return true;
+        if (lower.matches(".*(图呢|照片呢|图片呢|有图吗|有照片吗).*")) return true;
+        return false;
+    }
+
     private String buildConversationMemory(Integer conversationId) {
         List<Message> history = messageService.getHistory(conversationId);
         if (history == null || history.isEmpty()) {
@@ -870,8 +917,14 @@ public class AiController {
         if (!hasImage && question != null && question.trim().contains("提醒")) {
             return ChatIntent.REMINDER;
         }
-        // 短句且无图片、无画图/生成关键词时直接走对话，不调 LLM 意图识别，避免阻塞流式首包
         String q = question != null ? question.trim() : "";
+        // 有图且用户明确表达「生成/画/变体/风格/改图」等，直接判为图生图，避免被识别成图像理解
+        if (hasImage && (q.contains("生成") || q.contains("画") || q.contains("变体") || q.contains("风格") || q.contains("改图")
+                || q.contains("做一张") || q.contains("帮我画") || q.contains("画一张") || q.contains("生成图") || q.contains("做图")
+                || q.contains("画成") || q.contains("转成") || q.contains("变成"))) {
+            return ChatIntent.IMAGE_TO_IMAGE;
+        }
+        // 短句且无图片、无画图/生成关键词时直接走对话，不调 LLM 意图识别，避免阻塞流式首包
         if (!hasImage && q.length() > 0 && q.length() <= 20
                 && !q.contains("画") && !q.contains("生成") && !q.contains("图") && !q.contains("提醒")
                 && !q.contains("找") && !q.contains("搜") && !q.contains("查")) {

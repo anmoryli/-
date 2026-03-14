@@ -26,6 +26,7 @@ import { useAuth } from "@/lib/auth-context"
 import { updatePregnancy, updateUsername, uploadAvatar, updateAvatar } from "@/lib/api/user"
 import { getAllEnriched, type MemoItem } from "@/lib/api/memo"
 import { getUnreadCount } from "@/lib/api/notifications"
+import { getCreatorPregnancy } from "@/lib/api/family"
 import { getPregnancyInfo } from "@/lib/pregnancy"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import {
@@ -69,8 +70,14 @@ export default function ProfilePage() {
   const [records, setRecords] = useState<MemoItem[]>([])
   const [loadingRecords, setLoadingRecords] = useState(true)
   const [unreadCount, setUnreadCount] = useState(0)
+  const [creatorPregnancy, setCreatorPregnancy] = useState<{
+    creatorUsername: string
+    recordCount: number
+    lastMenstrualDate: string | null
+    pregnancyTime: string | null
+  } | null>(null)
 
-  // Fetch user records count
+  // Fetch user records count（孕妇本人）
   useEffect(() => {
     if (!user) return
     setLoadingRecords(true)
@@ -79,6 +86,26 @@ export default function ProfilePage() {
       .catch(() => setRecords([]))
       .finally(() => setLoadingRecords(false))
   }, [user])
+
+  // 家庭成员：拉取孕妇的怀孕进度
+  useEffect(() => {
+    if (!user || user.userType !== "family_member") {
+      setCreatorPregnancy(null)
+      return
+    }
+    getCreatorPregnancy(user.userId)
+      .then((data) => {
+        if (data && (data.lastMenstrualDate || data.pregnancyTime))
+          setCreatorPregnancy({
+            creatorUsername: data.creatorUsername || "孕妇",
+            recordCount: data.recordCount ?? 0,
+            lastMenstrualDate: data.lastMenstrualDate ?? null,
+            pregnancyTime: data.pregnancyTime ?? null,
+          })
+        else setCreatorPregnancy(null)
+      })
+      .catch(() => setCreatorPregnancy(null))
+  }, [user?.userId, user?.userType])
 
   // Fetch unread notifications count (poll; toast when new messages arrive)
   useEffect(() => {
@@ -101,13 +128,21 @@ export default function ProfilePage() {
 
   if (!user) return null
 
-  const info = user.pregnancyTime
-    ? getPregnancyInfo(user.lastMenstrualDate ?? user.pregnancyTime, user.pregnancyTime)
-    : null
+  // 孕妇本人用自己数据；家庭成员用创建者（孕妇）数据展示怀孕进度
+  const info =
+    user.userType === "pregnant" && user.pregnancyTime
+      ? getPregnancyInfo(user.lastMenstrualDate ?? user.pregnancyTime, user.pregnancyTime)
+      : creatorPregnancy?.lastMenstrualDate || creatorPregnancy?.pregnancyTime
+        ? getPregnancyInfo(
+            creatorPregnancy.lastMenstrualDate ?? creatorPregnancy.pregnancyTime!,
+            creatorPregnancy.pregnancyTime ?? undefined
+          )
+        : null
 
   const handleSave = async () => {
     const usernameChanged = editUsername.trim() && editUsername.trim() !== user.username
     const pregnancyChanged =
+      user.userType === "pregnant" &&
       editLastMenstrualDate && editDueDate &&
       (editLastMenstrualDate !== (user.lastMenstrualDate?.slice(0, 10) ?? "") || editDueDate !== (user.pregnancyTime?.slice(0, 10) ?? ""))
     const hasChanges = usernameChanged || editAvatarFile || pregnancyChanged
@@ -115,7 +150,7 @@ export default function ProfilePage() {
       toast.error("请至少修改一项")
       return
     }
-    if ((editLastMenstrualDate || editDueDate) && (!editLastMenstrualDate || !editDueDate)) {
+    if (user.userType === "pregnant" && (editLastMenstrualDate || editDueDate) && (!editLastMenstrualDate || !editDueDate)) {
       toast.error("怀孕日和预产期需同时填写")
       return
     }
@@ -160,7 +195,12 @@ export default function ProfilePage() {
   const stats = [
     {
       label: "孕期记录",
-      value: loadingRecords ? "-" : records.length,
+      value:
+        user.userType === "family_member"
+          ? (creatorPregnancy?.recordCount ?? "-")
+          : loadingRecords
+            ? "-"
+            : records.length,
       icon: BookOpen,
       color: "border-[var(--accent-1)]/30 bg-[var(--accent-1-muted)] text-[var(--accent-1)]",
     },
@@ -183,14 +223,16 @@ export default function ProfilePage() {
 
   const menuItems = [
     ...(isAdmin ? [{ label: "管理后台", icon: BarChart3, href: "/admin" }] : []),
-    ...((user.userType === "pregnant" || user.isSpouse === true) ? [
+    ...(user.userType === "pregnant" ? [
       { label: "孕期小目标", icon: Target, href: "/goals" },
       { label: "减压放松", icon: Wind, href: "/relax" },
-      { label: "孕期百科", icon: FileText, href: "/articles" },
     ] : []),
-    ...((user.userType === "pregnant" || user.isSpouse === true) ? [{ label: "爸爸成长营", icon: ListTodo, href: "/tasks" }] : []),
+    ...((user.userType === "pregnant" || user.isSpouse === true) ? [
+      { label: "孕期百科", icon: FileText, href: "/articles" },
+      { label: "爸爸成长营", icon: ListTodo, href: "/tasks" },
+    ] : []),
     { label: "站内消息", icon: Bell, href: "/notifications" },
-    { label: "我的模板作品", icon: Star, href: "/profile/my-posts" },
+    ...(user.userType === "pregnant" ? [{ label: "我的模板作品", icon: Star, href: "/profile/my-posts" }] : []),
     { label: "家人共享", icon: Users, href: "/family" },
     { label: user?.email ? "绑定邮箱（已绑定）" : "绑定邮箱", icon: Mail, href: "/profile/bind-email" },
     { label: "修改密码", icon: KeyRound, href: "/profile/change-password" },
@@ -231,7 +273,9 @@ export default function ProfilePage() {
               {info && (
                 <span className="flex items-center gap-1">
                   <Calendar className="h-3.5 w-3.5" strokeWidth={1.75} />
-                  预产期 {info.dueDateFormatted}
+                  {user.userType === "family_member" && creatorPregnancy
+                    ? `${creatorPregnancy.creatorUsername} 的预产期 ${info.dueDateFormatted}`
+                    : `预产期 ${info.dueDateFormatted}`}
                 </span>
               )}
             </div>
@@ -300,20 +344,24 @@ export default function ProfilePage() {
                     )}
                   </div>
                 </div>
-                <div>
-                  <DateInput
-                    label="怀孕日（末次月经）"
-                    value={editLastMenstrualDate}
-                    onChange={setEditLastMenstrualDate}
-                  />
-                </div>
-                <div>
-                  <DateInput
-                    label="预产期"
-                    value={editDueDate}
-                    onChange={setEditDueDate}
-                  />
-                </div>
+                {user.userType === "pregnant" && (
+                  <>
+                    <div>
+                      <DateInput
+                        label="怀孕日（末次月经）"
+                        value={editLastMenstrualDate}
+                        onChange={setEditLastMenstrualDate}
+                      />
+                    </div>
+                    <div>
+                      <DateInput
+                        label="预产期"
+                        value={editDueDate}
+                        onChange={setEditDueDate}
+                      />
+                    </div>
+                  </>
+                )}
                 <Button
                   onClick={handleSave}
                   disabled={saving}
@@ -354,12 +402,14 @@ export default function ProfilePage() {
         })}
       </div>
 
-      {/* Pregnancy Progress Card */}
-      {info && (
+      {/* Pregnancy Progress Card — 孕妇本人或家庭成员（展示孕妇进度） */}
+      {info && (user.userType === "pregnant" || creatorPregnancy) && (
         <div className="card-elevated mt-6 rounded-xl p-5">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-[15px] font-medium text-[var(--foreground)]">孕期进度</p>
+              <p className="text-[15px] font-medium text-[var(--foreground)]">
+                {user.userType === "family_member" && creatorPregnancy ? "孕妇的怀孕进度" : "孕期进度"}
+              </p>
               <p className="mt-0.5 text-caption">
                 第{info.weeksPregnant}周{info.daysInCurrentWeek}天 · 第{info.trimester}孕期
               </p>

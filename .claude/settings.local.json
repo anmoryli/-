@@ -3,7 +3,11 @@
     "allow": [
       "Bash(ls -la /d/Code/Project/Merge/yunqibao/frontend/app/\\\\\\(app\\\\\\))",
       "Bash(ls -la \"/d/Code/Project/Merge/yunqibao/frontend/app/\\(app\\)/records\")",
-      "Bash(ls -la \"/d/Code/Project/Merge/yunqibao/frontend/app/\\(app\\)/timeline\")"
+      "Bash(ls -la \"/d/Code/Project/Merge/yunqibao/frontend/app/\\(app\\)/timeline\")",
+      "Bash(ls -la frontend/app/\\\\\\(app\\\\\\)/)",
+      "Bash(ls -la \"frontend/app/\\(app\\)/records/\")",
+      "Bash(ls -la \"frontend/app/\\(app\\)/family/\")",
+      "Bash(ls -la \"frontend/app/\\(app\\)/goals/\")"
     ]
   }
 }

@@ -23,11 +23,12 @@ import {
 import { useAuth } from "@/lib/auth-context"
 import {
   getAllEnriched,
+  getFamilyEnriched,
   deleteText,
   deletePhoto,
   deleteVoice,
   deleteFile,
-  exportPdf,
+  exportPdfToEmail,
   type MemoItem,
 } from "@/lib/api/memo"
 import { getMyFamily, getFamilyMembers } from "@/lib/api/family"
@@ -168,15 +169,23 @@ export default function RecordsPage() {
   const { user } = useAuth()
   const [records, setRecords] = useState<MemoItem[]>([])
   const [filter, setFilter] = useState("all")
+  const [recordFilter, setRecordFilter] = useState<"all" | "mom" | "dad">("all")
   const [loading, setLoading] = useState(true)
   const [dateRangeFrom, setDateRangeFrom] = useState<string>("")
   const [dateRangeTo, setDateRangeTo] = useState<string>("")
   const [keyword, setKeyword] = useState("")
   const [creatorUserId, setCreatorUserId] = useState<number | null>(null)
   const [creatorUsername, setCreatorUsername] = useState<string>("")
+  const [hasFamilyTwo, setHasFamilyTwo] = useState(false)
+  const [showExportModal, setShowExportModal] = useState(false)
+  const [exportScope, setExportScope] = useState<"mom" | "dad" | "both">("both")
+  const [exportFromDate, setExportFromDate] = useState("")
+  const [exportToDate, setExportToDate] = useState("")
+  const [exportSubmitting, setExportSubmitting] = useState(false)
   const timelineContainerRef = useRef<HTMLDivElement>(null)
 
   const isFamilyMember = user?.userType === "family_member"
+  const canAddRecord = !isFamilyMember || !!user?.isSpouse
 
   // 红→蓝→绿曲线：以视口中心为基准，远离中心的卡片沿曲线过渡（向中线靠拢+缩放）直至“消失感”，无透明度变化
   const updateScrollState = useCallback(() => {
@@ -227,6 +236,7 @@ export default function RecordsPage() {
         } else {
           setCreatorUserId(null)
           setCreatorUsername("")
+          setHasFamilyTwo(false)
           setRecords([])
           setLoading(false)
           return
@@ -234,8 +244,19 @@ export default function RecordsPage() {
       } else {
         setCreatorUserId(user.userId)
         setCreatorUsername(targetUsername)
+        setHasFamilyTwo(false)
       }
-      const data = await getAllEnriched(targetUserId, user.userId)
+      const family = await getMyFamily(user.userId)
+      const members = family ? await getFamilyMembers(family.familyId, user.userId) : []
+      const hasSpouse = (members ?? []).some((m) => m.isSpouse)
+      let data: MemoItem[]
+      if (family && hasSpouse) {
+        data = await getFamilyEnriched(user.userId)
+        setHasFamilyTwo(true)
+      } else {
+        data = await getAllEnriched(targetUserId, user.userId)
+        setHasFamilyTwo(false)
+      }
       setRecords(data || [])
     } catch {
       toast.error("获取记录失败")
@@ -275,14 +296,20 @@ export default function RecordsPage() {
     [fetchRecords]
   )
 
+  const recordByFiltered =
+    !hasFamilyTwo || recordFilter === "all"
+      ? records
+      : recordFilter === "mom"
+        ? records.filter((r) => r.recordBy === "mom")
+        : records.filter((r) => r.recordBy === "dad")
   const typeFilteredRecords =
     filter === "all"
-      ? records
+      ? recordByFiltered
       : filter === "milestone"
-        ? records.filter(isMilestoneRecord)
+        ? recordByFiltered.filter(isMilestoneRecord)
         : filter === "letter_to_future"
-          ? records.filter((r) => r.tag === "letter_to_future")
-          : records.filter((r) => r.type === filter)
+          ? recordByFiltered.filter((r) => r.tag === "letter_to_future")
+          : recordByFiltered.filter((r) => r.type === filter)
 
   const searchKey = keyword.trim().toLowerCase()
   const filteredRecords = !searchKey
@@ -292,7 +319,18 @@ export default function RecordsPage() {
         return text.includes(searchKey)
       })
 
-  const groupedByDate = filteredRecords.reduce<Record<string, MemoItem[]>>((acc, r) => {
+  const dateFilteredRecords =
+    !dateRangeFrom && !dateRangeTo
+      ? filteredRecords
+      : filteredRecords.filter((r) => {
+          const d = r.createTime?.slice(0, 10)
+          if (!d || d === "未知") return false
+          const from = dateRangeFrom || "0000-01-01"
+          const to = dateRangeTo || "9999-12-31"
+          return d >= from && d <= to
+        })
+
+  const groupedByDate = dateFilteredRecords.reduce<Record<string, MemoItem[]>>((acc, r) => {
     const date = r.createTime?.slice(0, 10) ?? "未知"
     if (!acc[date]) acc[date] = []
     acc[date].push(r)
@@ -302,7 +340,7 @@ export default function RecordsPage() {
 
   const rangeFrom = dateRangeFrom || sortedDates[0]
   const rangeTo = dateRangeTo || sortedDates[sortedDates.length - 1]
-  const rangeRecords = filteredRecords.filter((r) => {
+  const rangeRecords = dateFilteredRecords.filter((r) => {
     const d = r.createTime?.slice(0, 10)
     if (!d || d === "未知") return false
     return d >= rangeFrom && d <= rangeTo
@@ -345,19 +383,20 @@ export default function RecordsPage() {
           {records.length > 0 && (
             <button
               type="button"
-              onClick={() =>
-                exportPdf(
-                  creatorUserId ?? user.userId,
-                  creatorUsername || user.username || "用户"
-                )
-              }
+              onClick={() => {
+                const earliest = sortedDates.length > 0 ? sortedDates[sortedDates.length - 1] : ""
+                const today = new Date().toISOString().slice(0, 10)
+                setExportFromDate(dateRangeFrom || earliest)
+                setExportToDate(dateRangeTo || today)
+                setShowExportModal(true)
+              }}
               className="flex items-center gap-2 rounded-full border border-[var(--accent-2)]/50 bg-[var(--accent-2-muted)] px-3 py-2 text-[13px] font-medium text-[var(--accent-2)] transition-transform active:scale-95"
             >
               <FileDown className="h-4 w-4" strokeWidth={1.75} />
               导出 PDF
             </button>
           )}
-          {!isFamilyMember && (
+          {canAddRecord && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
@@ -384,6 +423,82 @@ export default function RecordsPage() {
           )}
         </div>
       </div>
+
+      {/* 导出 PDF 模态框：发邮箱、范围、日期 */}
+      {showExportModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => !exportSubmitting && setShowExportModal(false)}>
+          <div className="w-full max-w-sm rounded-xl border border-[var(--card-border)] bg-[var(--card)] p-4 shadow-lg" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-body font-semibold text-[var(--foreground)]">导出 PDF 至邮箱</h3>
+            <p className="mt-1 text-[13px] text-[var(--foreground-muted)]">完成后将发送至您的绑定邮箱，请稍候查收。</p>
+            <div className="mt-4 space-y-3">
+              <p className="text-[13px] font-medium text-[var(--foreground)]">导出范围</p>
+              <div className="flex gap-2">
+                {(["both", "mom", "dad"] as const).map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => setExportScope(s)}
+                    className={cn(
+                      "flex-1 rounded-lg border px-3 py-2 text-[13px] font-medium transition-colors",
+                      exportScope === s
+                        ? "border-[var(--accent-2)] bg-[var(--accent-2-muted)] text-[var(--accent-2)]"
+                        : "border-[var(--card-border)] bg-[var(--muted)] text-[var(--foreground-muted)]"
+                    )}
+                  >
+                    {s === "both" ? "两人的记录" : s === "mom" ? "仅妈妈" : "仅爸爸"}
+                  </button>
+                ))}
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  type="date"
+                  value={exportFromDate}
+                  onChange={(e) => setExportFromDate(e.target.value)}
+                  className="rounded-lg border border-[var(--card-border)] bg-[var(--muted)] px-3 py-2 text-[13px] text-[var(--foreground)]"
+                />
+                <input
+                  type="date"
+                  value={exportToDate}
+                  onChange={(e) => setExportToDate(e.target.value)}
+                  className="rounded-lg border border-[var(--card-border)] bg-[var(--muted)] px-3 py-2 text-[13px] text-[var(--foreground)]"
+                />
+              </div>
+            </div>
+            <div className="mt-6 flex gap-2">
+              <button
+                type="button"
+                onClick={() => !exportSubmitting && setShowExportModal(false)}
+                className="flex-1 rounded-lg border border-[var(--card-border)] py-2.5 text-[14px] font-medium text-[var(--foreground-muted)]"
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                disabled={exportSubmitting}
+                onClick={async () => {
+                  setExportSubmitting(true)
+                  try {
+                    await exportPdfToEmail(creatorUserId ?? user!.userId, {
+                      scope: exportScope,
+                      fromDate: exportFromDate || undefined,
+                      toDate: exportToDate || undefined,
+                    })
+                    toast.success("导出已提交，完成后将发送至您的邮箱")
+                    setShowExportModal(false)
+                  } catch (e) {
+                    toast.error(e instanceof Error ? e.message : "提交失败")
+                  } finally {
+                    setExportSubmitting(false)
+                  }
+                }}
+                className="flex-1 rounded-lg bg-[var(--accent-2)] py-2.5 text-[14px] font-medium text-[var(--foreground)] disabled:opacity-60"
+              >
+                {exportSubmitting ? "提交中…" : "确认导出"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 日期范围分享 */}
       {sortedDates.length > 0 && (
@@ -424,6 +539,25 @@ export default function RecordsPage() {
           className="w-full bg-transparent text-sm text-[var(--foreground)] placeholder:text-[var(--foreground-muted)] outline-none"
         />
       </div>
+
+      {/* 总/妈妈/爸爸 筛选（有配偶时显示） */}
+      {hasFamilyTwo && (
+        <div className="mt-4 flex gap-2 rounded-xl border border-[var(--card-border)] bg-[var(--muted)]/40 p-1">
+          {(["all", "mom", "dad"] as const).map((rf) => (
+            <button
+              key={rf}
+              type="button"
+              onClick={() => setRecordFilter(rf)}
+              className={cn(
+                "flex-1 rounded-lg px-3 py-2.5 text-[13px] font-medium transition-all",
+                recordFilter === rf ? "bg-white text-[var(--foreground)] shadow-sm" : "text-[var(--foreground-muted)] hover:text-[var(--foreground-secondary)]"
+              )}
+            >
+              {rf === "all" ? "总" : rf === "mom" ? "妈妈的记录" : "爸爸的记录"}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Filter tabs — 隐藏横向滚动条 */}
       <div className="scrollbar-hide mt-6 -mx-6 overflow-x-auto overflow-y-hidden px-6">
@@ -483,7 +617,7 @@ export default function RecordsPage() {
                 前往家人共享
               </Link>
             ) : (
-              !isFamilyMember && (
+              canAddRecord && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <button
@@ -524,6 +658,96 @@ export default function RecordsPage() {
             {sortedDates.map((dateStr) => {
               const items = groupedByDate[dateStr] ?? []
               const weekLabel = getWeekLabel(dateStr, items)
+              const dadItems = hasFamilyTwo ? items.filter((r) => r.recordBy === "dad") : []
+              const momItems = hasFamilyTwo ? items.filter((r) => r.recordBy === "mom") : []
+              const sortByTimeDesc = (a: MemoItem, b: MemoItem) => (new Date(b.createTime ?? 0).getTime() - new Date(a.createTime ?? 0).getTime())
+              const sortedDad = [...dadItems].sort(sortByTimeDesc)
+              const sortedMom = [...momItems].sort(sortByTimeDesc)
+
+              const renderCard = (record: MemoItem) => (
+                <div key={record.id} className="group relative w-full overflow-hidden rounded-lg bg-transparent min-h-[52px]">
+                  <Link href={`/records/${record.id}`} className="flex min-w-0 gap-2 p-2">
+                    <RecordTypeIcon type={record.type} tag={record.tag} />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap gap-1">
+                        <span className="inline-block rounded-full bg-[var(--muted)]/80 px-1.5 py-0.5 text-[10px] font-medium text-[var(--foreground-muted)]">
+                          {getTagLabel(record)}
+                        </span>
+                        {record.mood && moodLabels[record.mood] && (
+                          <span className="inline-block rounded-full bg-[var(--accent-3-muted)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--accent-3)]">{moodLabels[record.mood]}</span>
+                        )}
+                        {record.category?.split(/[,，]/).filter(Boolean).slice(0, 5).map((tag, i) => {
+                          const t = tag.trim()
+                          const show = t.length > 6 ? t.slice(0, 6) + "…" : t
+                          return (
+                            <span key={i} className="inline-block rounded-full bg-[var(--accent-2-muted)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--accent-2)]">{show}</span>
+                          )
+                        })}
+                      </div>
+                      <p className="mt-1 line-clamp-2 text-[13px] font-medium leading-snug text-[var(--foreground)]" style={{ fontFamily: "var(--font-serif)" }}>
+                        {getTitle(record)}
+                      </p>
+                      {getContent(record) && (
+                        <p className="mt-0.5 line-clamp-2 text-[12px] text-[var(--foreground-secondary)] leading-snug">{getContent(record)}</p>
+                      )}
+                      {record.type === "photo" && record.photoUrls && record.photoUrls.length > 0 && (
+                        <div className="mt-1 flex gap-1">
+                          {record.photoUrls.slice(0, 3).map((url, i) => (
+                            <div key={i} className="h-9 w-9 shrink-0 overflow-hidden rounded-lg bg-[var(--muted)]">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={url} alt="" className="h-full w-full object-cover" referrerPolicy="no-referrer" />
+                            </div>
+                          ))}
+                          {record.photoUrls.length > 3 && (
+                            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--muted)] text-[10px]">+{record.photoUrls.length - 3}</div>
+                          )}
+                        </div>
+                      )}
+                      {record.createTime && (
+                        <p className="mt-0.5 text-[11px] text-[var(--foreground-muted)]">
+                          {format(new Date(record.createTime), "HH:mm", { locale: zhCN })}
+                          {record.recordWeightKg != null ? ` · ${record.recordWeightKg}kg` : ""}
+                        </p>
+                      )}
+                    </div>
+                  </Link>
+                  {(!isFamilyMember || (user?.isSpouse && record.recordBy === "dad")) && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.preventDefault(); router.push(`/records/${record.id}/edit`) }}
+                        className="absolute right-11 top-1.5 flex h-6 w-6 items-center justify-center rounded-md bg-transparent text-[var(--foreground-muted)] active:opacity-80"
+                        aria-label="编辑"
+                      >
+                        <Pencil className="h-3.5 w-3.5" strokeWidth={1.75} />
+                      </button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <button
+                            type="button"
+                            className="absolute right-1 top-1.5 flex h-6 w-6 items-center justify-center rounded-md bg-transparent text-[var(--foreground-muted)] hover:bg-[var(--critical-muted)] hover:text-[var(--critical)]"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" strokeWidth={1.75} />
+                          </button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent className="border-[var(--card-border)]">
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>确认删除</AlertDialogTitle>
+                            <AlertDialogDescription>确定要删除这条记录吗？此操作不可撤销。</AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>取消</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => handleDelete(record)} className="bg-[var(--critical)] text-white hover:opacity-90">
+                              删除
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </>
+                  )}
+                </div>
+              )
+
               return (
                 <div key={dateStr} className="mb-6 animate-in fade-in duration-300">
                   <div className="flex flex-wrap items-baseline justify-center gap-2 py-3 px-6">
@@ -540,110 +764,34 @@ export default function RecordsPage() {
                     )}
                   </div>
 
-                  {items.map((record, itemIdx) => {
-                    const isLeft = itemIdx % 2 === 0
-                    const card = (
-                      <div className="group relative w-full overflow-hidden rounded-lg bg-transparent min-h-[52px]">
-                        <Link href={`/records/${record.id}`} className="flex min-w-0 gap-2 p-2">
-                          <RecordTypeIcon type={record.type} tag={record.tag} />
-                          <div className="min-w-0 flex-1">
-                            <div className="flex flex-wrap gap-1">
-                              <span className="inline-block rounded-full bg-[var(--muted)]/80 px-1.5 py-0.5 text-[10px] font-medium text-[var(--foreground-muted)]">
-                                {getTagLabel(record)}
-                              </span>
-                              {record.mood && moodLabels[record.mood] && (
-                                <span className="inline-block rounded-full bg-[var(--accent-3-muted)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--accent-3)]">{moodLabels[record.mood]}</span>
-                              )}
-                              {record.category?.split(/[,，]/).filter(Boolean).slice(0, 5).map((tag, i) => {
-                                const t = tag.trim()
-                                const show = t.length > 6 ? t.slice(0, 6) + "…" : t
-                                return (
-                                  <span key={i} className="inline-block rounded-full bg-[var(--accent-2-muted)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--accent-2)]">{show}</span>
-                                )
-                              })}
-                            </div>
-                            <p className="mt-1 line-clamp-2 text-[13px] font-medium leading-snug text-[var(--foreground)]" style={{ fontFamily: "var(--font-serif)" }}>
-                              {getTitle(record)}
-                            </p>
-                            {getContent(record) && (
-                              <p className="mt-0.5 line-clamp-2 text-[12px] text-[var(--foreground-secondary)] leading-snug">{getContent(record)}</p>
-                            )}
-                            {record.type === "photo" && record.photoUrls && record.photoUrls.length > 0 && (
-                              <div className="mt-1 flex gap-1">
-                                {record.photoUrls.slice(0, 3).map((url, i) => (
-                                  <div key={i} className="h-9 w-9 shrink-0 overflow-hidden rounded-lg bg-[var(--muted)]">
-                                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img src={url} alt="" className="h-full w-full object-cover" referrerPolicy="no-referrer" />
-                                  </div>
-                                ))}
-                                {record.photoUrls.length > 3 && (
-                                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--muted)] text-[10px]">+{record.photoUrls.length - 3}</div>
-                                )}
-                              </div>
-                            )}
-                            {record.createTime && (
-                              <p className="mt-0.5 text-[11px] text-[var(--foreground-muted)]">
-                                {format(new Date(record.createTime), "HH:mm", { locale: zhCN })}
-                                {record.recordWeightKg != null ? ` · ${record.recordWeightKg}kg` : ""}
-                              </p>
-                            )}
+                  {hasFamilyTwo ? (
+                    <div className="grid grid-cols-2 gap-4 px-2">
+                      <div className="space-y-2 min-w-0">
+                        <p className="text-[11px] font-medium text-[var(--foreground-muted)] mb-1">爸爸</p>
+                        {sortedDad.map((r) => (
+                          <div key={r.id} className="timeline-row min-h-[60px]" data-side="left" style={{ contentVisibility: "auto" } as React.CSSProperties}>
+                            {renderCard(r)}
                           </div>
-                        </Link>
-                        {!isFamilyMember && (
-                          <>
-                            <button
-                              type="button"
-                              onClick={(e) => { e.preventDefault(); router.push(`/records/${record.id}/edit`) }}
-                              className="absolute right-11 top-1.5 flex h-6 w-6 items-center justify-center rounded-md bg-transparent text-[var(--foreground-muted)] active:opacity-80"
-                              aria-label="编辑"
-                            >
-                              <Pencil className="h-3.5 w-3.5" strokeWidth={1.75} />
-                            </button>
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <button
-                                  type="button"
-                                  className="absolute right-1 top-1.5 flex h-6 w-6 items-center justify-center rounded-md bg-transparent text-[var(--foreground-muted)] hover:bg-[var(--critical-muted)] hover:text-[var(--critical)]"
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" strokeWidth={1.75} />
-                                </button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent className="border-[var(--card-border)]">
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>确认删除</AlertDialogTitle>
-                                  <AlertDialogDescription>确定要删除这条记录吗？此操作不可撤销。</AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>取消</AlertDialogCancel>
-                                  <AlertDialogAction onClick={() => handleDelete(record)} className="bg-[var(--critical)] text-white hover:opacity-90">
-                                    删除
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                          </>
-                        )}
+                        ))}
                       </div>
-                    )
-                    return (
-                      <div
-                        key={record.id}
-                        className="timeline-row grid grid-cols-[1fr_16px_1fr] items-stretch gap-0 min-h-[60px] py-0.5"
-                        data-side={isLeft ? "left" : "right"}
-                        style={{ contentVisibility: "auto" } as React.CSSProperties}
-                      >
-                        <div className={cn("min-w-0 flex items-center", isLeft ? "timeline-card-left" : "invisible")}>
-                          {isLeft ? card : null}
-                        </div>
-                        <div className="flex items-center justify-center relative z-10">
-                          <div className="timeline-dot" aria-hidden />
-                        </div>
-                        <div className={cn("min-w-0 flex items-center", !isLeft ? "timeline-card-right" : "invisible")}>
-                          {!isLeft ? card : null}
-                        </div>
+                      <div className="space-y-2 min-w-0">
+                        <p className="text-[11px] font-medium text-[var(--foreground-muted)] mb-1">妈妈</p>
+                        {sortedMom.map((r) => (
+                          <div key={r.id} className="timeline-row min-h-[60px]" data-side="right" style={{ contentVisibility: "auto" } as React.CSSProperties}>
+                            {renderCard(r)}
+                          </div>
+                        ))}
                       </div>
-                    )
-                  })}
+                    </div>
+                  ) : (
+                    <div className="space-y-2 px-2">
+                      {items.map((record) => (
+                        <div key={record.id} className="timeline-row" style={{ contentVisibility: "auto" } as React.CSSProperties}>
+                          {renderCard(record)}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )
             })}

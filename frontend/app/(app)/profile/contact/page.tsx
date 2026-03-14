@@ -2,30 +2,45 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, Mail, MessageSquare, Send } from "lucide-react"
+import { ArrowLeft, Mail, Send } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { toast } from "sonner"
+import { useAuth } from "@/lib/auth-context"
+import { apiPost } from "@/lib/api"
 
-const SUPPORT_EMAIL = "support@yunqibao.com"
+const SUPPORT_EMAIL = "anmory@qq.com"
 
 export default function ContactPage() {
   const router = useRouter()
+  const { user } = useAuth()
   const [subject, setSubject] = useState("")
   const [content, setContent] = useState("")
+  const [sending, setSending] = useState(false)
 
   const handleCopyEmail = () => {
     navigator.clipboard.writeText(SUPPORT_EMAIL)
     toast.success("邮箱已复制到剪贴板")
   }
 
-  const handleMailto = () => {
-    const body = content ? `\n\n---\n${content}` : ""
-    const url = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(subject || "孕期宝 - 用户咨询")}${body ? `&body=${encodeURIComponent(body)}` : ""}`
-    window.location.href = url
-    toast.success("即将打开邮件客户端")
+  const handleSend = async () => {
+    setSending(true)
+    try {
+      await apiPost<void>("/api/feedback/send", {
+        subject: subject || "孕期宝 - 用户咨询",
+        content: content || "",
+        userId: user?.userId,
+      })
+      toast.success("已发送，我们会尽快回复")
+      setSubject("")
+      setContent("")
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "发送失败，请稍后重试")
+    } finally {
+      setSending(false)
+    }
   }
 
   return (
@@ -78,9 +93,9 @@ export default function ContactPage() {
               className="mt-2 min-h-[120px]"
             />
           </div>
-          <Button onClick={handleMailto} className="w-full">
+          <Button onClick={handleSend} disabled={sending} className="w-full">
             <Send className="mr-2 h-4 w-4" />
-            打开邮件客户端
+            {sending ? "发送中…" : "发送邮件"}
           </Button>
         </div>
 

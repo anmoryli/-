@@ -57,14 +57,16 @@ public class MentionMailServiceImpl implements MentionMailService {
             try {
                 String subject = "孕期宝：有人在新记录中提到了你";
                 String snippet = content.length() > 100 ? content.substring(0, 100) + "…" : content;
-                String body = String.format(
-                    "你好，%s\n\n%s 在孕期记录中提到了你。\n\n记录类型：%s\n标题：%s\n内容摘要：%s\n\n快去孕期宝看看吧～",
-                    username, ownerName,
-                    "text".equals(recordType) ? "文字记录" : "照片记录",
-                    title != null ? title : "无标题",
-                    snippet
+                String typeLabelMention = "text".equals(recordType) ? "文字记录" : "photo".equals(recordType) ? "照片记录" : "记录";
+                String htmlBody = com.anmory.yunji.service.impl.MailServiceImpl.wrapHtmlBody(
+                    "<p style=\"margin:0 0 12px;font-size:15px;\">你好，" + escapeHtml(username) + "，</p>"
+                    + "<p style=\"margin:0 0 12px;font-size:15px;\">" + escapeHtml(ownerName) + " 在孕期记录中提到了你。</p>"
+                    + "<p style=\"margin:0 0 8px;font-size:14px;color:#2d2b29;\"><strong>记录类型：</strong>" + typeLabelMention + "</p>"
+                    + "<p style=\"margin:0 0 8px;font-size:14px;color:#2d2b29;\"><strong>标题：</strong>" + escapeHtml(title != null ? title : "无标题") + "</p>"
+                    + "<p style=\"margin:0 0 16px;font-size:14px;color:#555351;\">内容摘要：" + escapeHtml(snippet) + "</p>"
+                    + "<p style=\"margin:0;font-size:14px;color:#555351;\">快去孕期宝看看吧～</p>"
                 );
-                mailService.sendTextMail(member.getEmail(), subject, body);
+                mailService.sendHtmlMail(member.getEmail(), subject, htmlBody);
                 log.info("提及通知邮件已发送 memoId={} toUserId={}", memoId, memberUserId);
             } catch (Exception ex) {
                 log.warn("提及通知邮件发送失败 memoId={} toUserId={}", memoId, memberUserId, ex);
@@ -77,44 +79,70 @@ public class MentionMailServiceImpl implements MentionMailService {
     public void notifySpouseNewRecordAsync(Integer recordOwnerId, Integer memoId, String recordType, String title, String contentSnippet) {
         Family family = familyService.getMyFamily(recordOwnerId);
         if (family == null) return;
-        if (!family.getCreatorUserId().equals(recordOwnerId)) return;
-        List<Integer> spouseIds = familyService.getSpouseUserIds(recordOwnerId);
         User owner = userService.getById(recordOwnerId);
-        String ownerName = owner != null ? owner.getUsername() : "准妈妈";
+        String ownerName = owner != null ? owner.getUsername() : "家人";
         String typeLabel = "text".equals(recordType) ? "文字记录" : "voice".equals(recordType) ? "语音记录" : "photo".equals(recordType) ? "照片记录" : "file".equals(recordType) ? "文件记录" : "记录";
-        if (!spouseIds.isEmpty()) {
-            for (Integer spouseId : spouseIds) {
-                User spouse = userService.getById(spouseId);
-                if (spouse == null || spouse.getEmail() == null || spouse.getEmail().isBlank()) continue;
-                try {
-                    String subject = "孕期宝：准妈妈有新记录";
-                    String snippet = contentSnippet != null && contentSnippet.length() > 80 ? contentSnippet.substring(0, 80) + "…" : (contentSnippet != null ? contentSnippet : "");
-                    String body = String.format(
-                        "你好，%s\n\n%s 刚刚发布了一条新的孕期%s。\n\n标题：%s\n%s\n\n打开孕期宝 App 在「记录」中查看，一起陪伴孕期时光。",
-                        spouse.getUsername(),
-                        ownerName,
-                        typeLabel,
-                        title != null ? title : "无标题",
-                        snippet.isEmpty() ? "" : "内容摘要：" + snippet + "\n\n"
-                    );
-                    mailService.sendTextMail(spouse.getEmail(), subject, body);
-                    log.info("[新记录通知] 已向配偶发邮件 memoId={} spouseUserId={}", memoId, spouseId);
-                } catch (Exception e) {
-                    log.warn("[新记录通知] 邮件发送失败 memoId={} spouseUserId={}", memoId, spouseId, e);
+        boolean isCreator = family.getCreatorUserId().equals(recordOwnerId);
+
+        if (isCreator) {
+            List<Integer> spouseIds = familyService.getSpouseUserIds(recordOwnerId);
+            if (!spouseIds.isEmpty()) {
+                for (Integer spouseId : spouseIds) {
+                    User spouse = userService.getById(spouseId);
+                    if (spouse == null || spouse.getEmail() == null || spouse.getEmail().isBlank()) continue;
+                    try {
+                        String subject = "孕期宝：准妈妈有新记录";
+                        String snippet = contentSnippet != null && contentSnippet.length() > 80 ? contentSnippet.substring(0, 80) + "…" : (contentSnippet != null ? contentSnippet : "");
+                        String htmlBody = com.anmory.yunji.service.impl.MailServiceImpl.wrapHtmlBody(
+                            "<p style=\"margin:0 0 12px;font-size:15px;\">你好，" + escapeHtml(spouse.getUsername()) + "，</p>"
+                            + "<p style=\"margin:0 0 12px;font-size:15px;\">" + escapeHtml(ownerName) + " 刚刚发布了一条新的孕期" + typeLabel + "。</p>"
+                            + "<p style=\"margin:0 0 8px;font-size:14px;color:#2d2b29;\"><strong>标题：</strong>" + escapeHtml(title != null ? title : "无标题") + "</p>"
+                            + (snippet.isEmpty() ? "" : "<p style=\"margin:0 0 16px;font-size:14px;color:#555351;\">内容摘要：" + escapeHtml(snippet) + "</p>")
+                            + "<p style=\"margin:0;font-size:14px;color:#555351;\">打开孕期宝 App 在「记录」中查看，一起陪伴孕期时光。</p>"
+                        );
+                        mailService.sendHtmlMail(spouse.getEmail(), subject, htmlBody);
+                        log.info("[新记录通知] 已向配偶发邮件 memoId={} spouseUserId={}", memoId, spouseId);
+                    } catch (Exception e) {
+                        log.warn("[新记录通知] 邮件发送失败 memoId={} spouseUserId={}", memoId, spouseId, e);
+                    }
+                }
+            } else {
+                String inviteSpouseTitle = "邀请配偶加入后可同步记录";
+                if (userNotificationMapper.countByUserIdAndTypeAndTitle(recordOwnerId, "system", inviteSpouseTitle) == 0) {
+                    UserNotification n = new UserNotification();
+                    n.setUserId(recordOwnerId);
+                    n.setType("system");
+                    n.setTitle(inviteSpouseTitle);
+                    n.setBody("在「家人共享」中邀请配偶加入，对方即可在 App 内收到你的新记录提醒。");
+                    n.setRelatedTaskId(null);
+                    userNotificationMapper.insert(n);
+                    log.info("[新记录通知] 无配偶，已向孕妇发站内提醒（仅提醒一次） recordOwnerId={}", recordOwnerId);
                 }
             }
         } else {
-            String inviteSpouseTitle = "邀请配偶加入后可同步记录";
-            if (userNotificationMapper.countByUserIdAndTypeAndTitle(recordOwnerId, "system", inviteSpouseTitle) == 0) {
-                UserNotification n = new UserNotification();
-                n.setUserId(recordOwnerId);
-                n.setType("system");
-                n.setTitle(inviteSpouseTitle);
-                n.setBody("在「家人共享」中邀请配偶加入，对方即可在 App 内收到你的新记录提醒。");
-                n.setRelatedTaskId(null);
-                userNotificationMapper.insert(n);
-                log.info("[新记录通知] 无配偶，已向孕妇发站内提醒（仅提醒一次） recordOwnerId={}", recordOwnerId);
+            User creator = userService.getById(family.getCreatorUserId());
+            if (creator != null && creator.getEmail() != null && !creator.getEmail().isBlank()) {
+                try {
+                    String subject = "孕期宝：准爸爸有新记录";
+                    String snippet = contentSnippet != null && contentSnippet.length() > 80 ? contentSnippet.substring(0, 80) + "…" : (contentSnippet != null ? contentSnippet : "");
+                    String htmlBody = com.anmory.yunji.service.impl.MailServiceImpl.wrapHtmlBody(
+                        "<p style=\"margin:0 0 12px;font-size:15px;\">你好，" + escapeHtml(creator.getUsername()) + "，</p>"
+                        + "<p style=\"margin:0 0 12px;font-size:15px;\">" + escapeHtml(ownerName) + " 刚刚发布了一条新的孕期" + typeLabel + "。</p>"
+                        + "<p style=\"margin:0 0 8px;font-size:14px;color:#2d2b29;\"><strong>标题：</strong>" + escapeHtml(title != null ? title : "无标题") + "</p>"
+                        + (snippet.isEmpty() ? "" : "<p style=\"margin:0 0 16px;font-size:14px;color:#555351;\">内容摘要：" + escapeHtml(snippet) + "</p>")
+                        + "<p style=\"margin:0;font-size:14px;color:#555351;\">打开孕期宝 App 在「记录」中查看。</p>"
+                    );
+                    mailService.sendHtmlMail(creator.getEmail(), subject, htmlBody);
+                    log.info("[新记录通知] 已向孕妇发邮件（爸爸发记录） memoId={} creatorUserId={}", memoId, family.getCreatorUserId());
+                } catch (Exception e) {
+                    log.warn("[新记录通知] 邮件发送失败 memoId={} creatorUserId={}", memoId, family.getCreatorUserId(), e);
+                }
             }
         }
+    }
+
+    private static String escapeHtml(String s) {
+        if (s == null) return "";
+        return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;");
     }
 }

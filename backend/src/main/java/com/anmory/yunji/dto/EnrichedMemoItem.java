@@ -27,4 +27,6 @@ public class EnrichedMemoItem {
     private String tag;
     private String mood;
     private Integer commentCount;
+    /** 导出时区分记录者：mom=妈妈/创建者，dad=爸爸/配偶 */
+    private String recordBy;
 }

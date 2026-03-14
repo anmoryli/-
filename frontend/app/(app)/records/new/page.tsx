@@ -80,10 +80,11 @@ export default function NewRecordPage() {
   const [visibleTo, setVisibleTo] = useState<number[]>([])
   const [showVisibleModal, setShowVisibleModal] = useState(false)
   const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([])
+  const [creatorUserId, setCreatorUserId] = useState<number | null>(null)
 
-  // 家庭成员不可创建记录，重定向到记录页
+  // 非配偶的家庭成员不可创建记录，重定向到记录页；配偶（爸爸）可创建记录
   useEffect(() => {
-    if (user && user.userType === "family_member") {
+    if (user && user.userType === "family_member" && !user?.isSpouse) {
       router.replace("/records")
     }
   }, [user, router])
@@ -102,6 +103,7 @@ export default function NewRecordPage() {
     getMyFamily(user.userId)
       .then((f) => {
         if (f) {
+          setCreatorUserId(f.creatorUserId)
           return getFamilyMembers(f.familyId, user.userId).then((members) => {
             setFamilyMembers(members ?? [])
             const spouseIds = (members ?? []).filter((m) => m.isSpouse).map((m) => m.userId)
@@ -143,7 +145,7 @@ export default function NewRecordPage() {
         voiceFileInputRef.current?.click()
         return
       }
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false })
       const mediaRecorder = new MediaRecorder(stream)
       mediaRecorderRef.current = mediaRecorder
       const chunks: BlobPart[] = []
@@ -542,29 +544,43 @@ export default function NewRecordPage() {
           <div className="mx-4 max-h-[70vh] w-full max-w-sm overflow-auto rounded-xl border border-[var(--card-border)] bg-[var(--card)] p-4 shadow-lg" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-body font-semibold">{visibilityMode === "blocklist" ? "选择不可见成员" : "选择可见成员"}</h3>
             <p className="mt-1 text-micro text-[var(--foreground-muted)]">
-              {visibilityMode === "blocklist" ? "勾选的成员将无法查看此记录" : "仅勾选的成员可查看，配偶会自动包含"}
+              {visibilityMode === "blocklist"
+                ? "勾选的成员将无法查看此记录。配偶与孕妇始终互相可见，不可排除。"
+                : "仅勾选的成员可查看，配偶会自动包含"}
             </p>
             <div className="mt-4 space-y-2">
-              {familyMembers.filter((m) => m.userId !== user?.userId).map((m) => (
-                <label key={m.userId} className="flex items-center gap-2 rounded-lg border border-[var(--card-border)] px-3 py-2">
-                  <input
-                    type="checkbox"
-                    checked={visibleTo.includes(m.userId)}
-                    disabled={visibilityMode === "allowlist" && m.isSpouse}
-                    onChange={(e) => {
-                      if (visibilityMode === "allowlist" && m.isSpouse) return
-                      if (e.target.checked) setVisibleTo((p) => [...p, m.userId])
-                      else setVisibleTo((p) => p.filter((id) => id !== m.userId))
-                    }}
-                    className="rounded"
-                  />
-                  <span className="text-caption">
-                    {m.username || "成员"}
-                    {m.relationship ? ` (${m.relationship})` : ""}
-                    {visibilityMode === "allowlist" && m.isSpouse && <span className="ml-1 text-[var(--accent-2)]">（配偶，必含）</span>}
-                  </span>
-                </label>
-              ))}
+              {familyMembers.filter((m) => m.userId !== user?.userId).map((m) => {
+                const isPartner = !!m.isSpouse || m.userId === creatorUserId
+                const blocklistDisabled = visibilityMode === "blocklist" && isPartner
+                return (
+                  <label
+                    key={m.userId}
+                    className={cn(
+                      "flex items-center gap-2 rounded-lg border border-[var(--card-border)] px-3 py-2",
+                      blocklistDisabled && "opacity-70"
+                    )}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={visibleTo.includes(m.userId)}
+                      disabled={(visibilityMode === "allowlist" && m.isSpouse) || blocklistDisabled}
+                      onChange={(e) => {
+                        if (visibilityMode === "allowlist" && m.isSpouse) return
+                        if (blocklistDisabled) return
+                        if (e.target.checked) setVisibleTo((p) => [...p, m.userId])
+                        else setVisibleTo((p) => p.filter((id) => id !== m.userId))
+                      }}
+                      className="rounded"
+                    />
+                    <span className="text-caption">
+                      {m.username || "成员"}
+                      {m.relationship ? ` (${m.relationship})` : ""}
+                      {visibilityMode === "allowlist" && m.isSpouse && <span className="ml-1 text-[var(--accent-2)]">（配偶，必含）</span>}
+                      {blocklistDisabled && <span className="ml-1 text-[var(--accent-2)]">（始终可见）</span>}
+                    </span>
+                  </label>
+                )
+              })}
             </div>
             <button
               type="button"

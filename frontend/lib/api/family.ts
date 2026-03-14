@@ -79,3 +79,18 @@ export async function leaveFamily(userId: number): Promise<void> {
 export async function dissolveFamily(userId: number): Promise<void> {
   await apiPost<void>("/api/family/dissolve", { userId })
 }
+
+/** 家庭成员查看孕妇的怀孕进度：返回创建者的孕期信息与记录数 */
+export interface CreatorPregnancyInfo {
+  creatorUserId: number
+  creatorUsername: string
+  lastMenstrualDate: string | null
+  pregnancyTime: string | null
+  recordCount: number
+}
+
+export async function getCreatorPregnancy(userId: number): Promise<CreatorPregnancyInfo | null> {
+  const data = await apiGet<CreatorPregnancyInfo | Record<string, never>>("/api/family/creator-pregnancy", { userId })
+  if (!data || typeof (data as CreatorPregnancyInfo).creatorUserId !== "number") return null
+  return data as CreatorPregnancyInfo
+}

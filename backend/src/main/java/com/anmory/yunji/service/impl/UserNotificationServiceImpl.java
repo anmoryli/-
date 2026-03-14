@@ -69,4 +69,16 @@ public class UserNotificationServiceImpl implements UserNotificationService {
         n.setRelatedTaskId(relatedTaskId);
         userNotificationMapper.insert(n);
     }
+
+    @Override
+    public void notifySystem(Integer userId, String title, String body) {
+        if (userId == null) return;
+        UserNotification n = new UserNotification();
+        n.setUserId(userId);
+        n.setType("system");
+        n.setTitle(title != null ? title : "系统通知");
+        n.setBody(body);
+        n.setRelatedTaskId(null);
+        userNotificationMapper.insert(n);
+    }
 }

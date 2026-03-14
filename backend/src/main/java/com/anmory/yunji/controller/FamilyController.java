@@ -83,4 +83,11 @@ public class FamilyController {
             return Result.error(e.getMessage());
         }
     }
+
+    /** 家庭成员查看孕妇的怀孕进度：返回创建者的孕期信息与记录数，供「我的」页展示 */
+    @GetMapping("/creator-pregnancy")
+    public Result<Map<String, Object>> getCreatorPregnancy(@RequestParam("userId") Integer userId) {
+        Map<String, Object> info = familyService.getCreatorPregnancyInfo(userId);
+        return Result.success(info != null ? info : java.util.Collections.emptyMap());
+    }
 }

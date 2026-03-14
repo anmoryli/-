@@ -67,4 +67,10 @@ public interface FamilyService {
      * 用户是否为某家庭的配偶（is_spouse=1）
      */
     boolean isSpouse(Integer userId);
+
+    /**
+     * 家庭成员查看「孕妇的怀孕进度」：返回所在家庭的创建者（孕妇）的孕期信息与记录数。
+     * 若当前用户不是家庭成员或未加入家庭，返回 null。
+     */
+    java.util.Map<String, Object> getCreatorPregnancyInfo(Integer memberUserId);
 }

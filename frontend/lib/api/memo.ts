@@ -76,6 +76,8 @@ export interface MemoItem {
   fileUrl?: string
   photoUrls?: string[]
   photoDescription?: string
+  /** 家庭合并列表时：该条记录由谁创建 mom=妈妈/创建者 dad=爸爸/配偶 */
+  recordBy?: "mom" | "dad"
 }
 
 /** 后端 Memo 表返回结构（无 title/content，需与 text/voice/photo 合并） */
@@ -364,6 +366,19 @@ export function exportDateRangePdf(userId: number, username: string, fromDate: s
   window.open(url, "_blank")
 }
 
+/** 导出 PDF 并异步发邮件（202 立即返回，完成后发邮箱；失败发站内通知） */
+export async function exportPdfToEmail(
+  userId: number,
+  options?: { email?: string; scope?: "mom" | "dad" | "both"; fromDate?: string; toDate?: string }
+): Promise<void> {
+  const params: Record<string, string | number> = { userId }
+  if (options?.email) params.email = options.email
+  params.scope = options?.scope ?? "both"
+  if (options?.fromDate) params.fromDate = options.fromDate
+  if (options?.toDate) params.toDate = options.toDate
+  await apiPost<void>("/api/memo/exportPdfToEmail", params)
+}
+
 /** 获取用户所有记录（仅 memo 主表，无 title/content，文字类只会有类型标签）
  * @param requestUserId 当前查看者的 userId，用于按可见范围过滤。若与 userId 相同则为本人查看
  */
@@ -435,6 +450,105 @@ export async function getAllEnriched(userId: number, requestUserId?: number): Pr
       category: m.category,
       visibilityMode: m.visibilityMode ?? "all",
       visibleTo: m.visibleTo,
+    }
+    if (item.type === "text") {
+      const t = textByMemoId.get(m.memoId)
+      if (t) {
+        item.title = t.title
+        item.content = t.content
+        item.textId = t.textId
+      }
+    } else if (item.type === "voice") {
+      const v = voiceByMemoId.get(m.memoId)
+      if (v) {
+        item.title = v.title
+        item.voiceUrl = v.voiceUrl ?? v.url
+        item.voiceId = v.voiceId
+      }
+    } else if (item.type === "photo") {
+      item.title = "照片记录"
+      item.photoUrls = photoUrlsByMemoId.get(m.memoId) ?? []
+    } else if (item.type === "file") {
+      const f = fileByMemoId.get(m.memoId)
+      if (f) {
+        item.title = f.title
+        item.fileUrl = f.url
+        item.fileId = f.fileId
+      }
+    }
+    return item
+  })
+
+  return list.sort((a, b) => {
+    const ta = a.createTime ? new Date(a.createTime).getTime() : 0
+    const tb = b.createTime ? new Date(b.createTime).getTime() : 0
+    return tb - ta
+  })
+}
+
+/** 家庭记录：妈妈+爸爸合并列表，每条带 recordBy。有家庭且为家庭成员时使用。 */
+export async function getFamilyEnriched(requestUserId: number): Promise<MemoItem[]> {
+  log("getFamilyEnriched", { requestUserId })
+  if (USE_MOCK) {
+    await mockDelay()
+    return mockGetAllMemos()
+  }
+  const data = await apiGet<{ mom: MemoRaw[]; dad: MemoRaw[] }>("/api/memo/getFamilyEnriched", {
+    requestUserId: String(requestUserId),
+  })
+  const mom = data?.mom ?? []
+  const dad = data?.dad ?? []
+  const withRecordBy = [
+    ...mom.map((m) => ({ ...m, recordBy: "mom" as const })),
+    ...dad.map((m) => ({ ...m, recordBy: "dad" as const })),
+  ]
+  withRecordBy.sort((a, b) => {
+    const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0
+    const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0
+    return tb - ta
+  })
+  const ownerIds = [...new Set(withRecordBy.map((m) => m.userId).filter((id): id is number => id != null))]
+  const [textsArr, voicesArr, photosArr, filesArr] = await Promise.all([
+    Promise.all(ownerIds.map((uid) => apiGet<TextRaw[]>("/api/memo/getTextByUserId", { userId: String(uid) }))),
+    Promise.all(ownerIds.map((uid) => apiGet<VoiceRaw[]>("/api/memo/getVoiceByUserId", { userId: String(uid) }))),
+    Promise.all(ownerIds.map((uid) => apiGet<PhotoRaw[]>("/api/memo/getPhotoByUserId", { userId: String(uid) }))),
+    Promise.all(ownerIds.map((uid) => apiGet<FileRaw[]>("/api/memo/getFileByUserId", { userId: String(uid) }))),
+  ])
+  const texts = (textsArr ?? []).flat().filter(Boolean)
+  const voices = (voicesArr ?? []).flat().filter(Boolean)
+  const photos = (photosArr ?? []).flat().filter(Boolean)
+  const files = (filesArr ?? []).flat().filter(Boolean)
+  const textByMemoId = new Map<number, TextRaw>()
+  for (const t of texts) textByMemoId.set(t.memoId, t)
+  const voiceByMemoId = new Map<number, VoiceRaw>()
+  for (const v of voices) voiceByMemoId.set(v.memoId, v)
+  const photoUrlsByMemoId = new Map<number, string[]>()
+  for (const p of photos) {
+    const list = photoUrlsByMemoId.get(p.memoId) ?? []
+    if (p.url) list.push(p.url)
+    photoUrlsByMemoId.set(p.memoId, list)
+  }
+  const fileByMemoId = new Map<number, FileRaw>()
+  for (const f of files) fileByMemoId.set(f.memoId, f)
+
+  const list: MemoItem[] = withRecordBy.map((m) => {
+    const type = (m.type === "text" || m.type === "voice" || m.type === "file" || m.type === "photo"
+      ? m.type
+      : "text") as MemoItem["type"]
+    const item: MemoItem = {
+      id: m.memoId,
+      type,
+      tag: m.tag,
+      createTime: m.createdAt,
+      photoDescription: m.photoDescription,
+      pregnancyWeek: m.pregnancyWeek,
+      pregnancyWeekIndex: m.pregnancyWeekIndex,
+      recordWeightKg: m.recordWeightKg,
+      mood: m.mood,
+      category: m.category,
+      visibilityMode: m.visibilityMode ?? "all",
+      visibleTo: m.visibleTo,
+      recordBy: m.recordBy,
     }
     if (item.type === "text") {
       const t = textByMemoId.get(m.memoId)

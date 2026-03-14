@@ -54,6 +54,27 @@ public class AliOssUtil {
     }
 
     /**
+     * 生成导出 PDF 的 ObjectKey（用于发邮件时提供下载链接，避免大附件导致连接重置）
+     */
+    private String generateExportPdfObjectKey(Integer userId) {
+        String uniqueFileName = UUID.randomUUID() + ".pdf";
+        return "yunji/" + userId + "/export/" + uniqueFileName;
+    }
+
+    /**
+     * 上传导出 PDF 到 OSS，返回可访问的 URL（用于邮件中「点击下载」链接）
+     */
+    public String uploadExportPdf(Integer userId, byte[] pdfBytes) {
+        try {
+            String objectKey = generateExportPdfObjectKey(userId);
+            return upload(pdfBytes, objectKey);
+        } catch (Exception e) {
+            log.error("导出 PDF 上传 OSS 失败", e);
+            throw new RuntimeException("导出 PDF 上传失败");
+        }
+    }
+
+    /**
      * 生成 AI 聊天图片 ObjectKey（用户上传图 / AI 生成图）
      */
     private String generateChatImageObjectKey(Integer userId, String suffix) {

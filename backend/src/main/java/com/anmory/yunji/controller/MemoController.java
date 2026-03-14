@@ -13,10 +13,14 @@ import com.anmory.yunji.service.MentionMailService;
 import com.anmory.yunji.mapper.MemoMapper;
 import com.anmory.yunji.mapper.TextMapper;
 import com.anmory.yunji.common.RagService;
+import com.anmory.yunji.service.MailService;
 import com.anmory.yunji.service.MemoService;
 import com.anmory.yunji.service.PdfExportService;
 import com.anmory.yunji.service.PromptService;
+import com.anmory.yunji.service.UserNotificationService;
 import com.anmory.yunji.service.UserService;
+import com.anmory.yunji.dto.EnrichedMemoItem;
+import com.anmory.yunji.entity.User;
 import com.anmory.yunji.utils.AliOssUtil;
 import com.anmory.yunji.utils.PregnancyWeekUtil;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +29,7 @@ import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -58,6 +63,8 @@ public class MemoController {
     private final PdfExportService pdfExportService;
     private final PromptService promptService;
     private final FamilyService familyService;
+    private final MailService mailService;
+    private final UserNotificationService userNotificationService;
     private final MentionMailService mentionMailService;
     private final MemoAiEnrichmentService memoAiEnrichmentService;
     private final ImageUnderstandingService imageUnderstandingService;
@@ -72,11 +79,22 @@ public class MemoController {
         return user.getLastMenstrualDate().toString();
     }
 
-    /** 校验并规范化 visibleTo。allowlist 时确保配偶在列表中；blocklist 时不强制；all 时返回空 */
+    /** 校验并规范化 visibleTo。allowlist 时确保配偶在列表中；blocklist 时孕妇与配偶互相不可设为不可见，从 blocklist 中移除对方。 */
     private String validateAndNormalizeVisibleTo(Integer userId, String visibilityMode, String visibleTo) {
         if (visibilityMode == null || visibilityMode.isBlank()) visibilityMode = "all";
         if ("all".equals(visibilityMode)) return null;
-        if ("blocklist".equals(visibilityMode)) return visibleTo;
+        if ("blocklist".equals(visibilityMode)) {
+            Set<Integer> blocked = parseVisibleToIds(visibleTo);
+            if (blocked == null || blocked.isEmpty()) return visibleTo;
+            com.anmory.yunji.entity.Family family = familyService.getMyFamily(userId);
+            if (family != null && family.getCreatorUserId() != null) {
+                blocked.remove(family.getCreatorUserId());
+                List<Integer> spouseIds = familyService.getSpouseUserIds(family.getCreatorUserId());
+                if (spouseIds != null) blocked.removeAll(spouseIds);
+            }
+            if (blocked.isEmpty()) return null;
+            return String.join(",", blocked.stream().map(String::valueOf).toList());
+        }
         if ("allowlist".equals(visibilityMode)) {
             List<Integer> spouseIds = familyService.getSpouseUserIds(userId);
             if (spouseIds.isEmpty()) return visibleTo;
@@ -88,6 +106,14 @@ public class MemoController {
             return String.join(",", allowed.stream().map(String::valueOf).toList());
         }
         return visibleTo;
+    }
+
+    /** 当前用户是否为某家庭的配偶（爸爸） */
+    private boolean isSpouseUser(Integer userId) {
+        com.anmory.yunji.entity.Family f = familyService.getMyFamily(userId);
+        if (f == null || f.getCreatorUserId() == null) return false;
+        List<Integer> spouseIds = familyService.getSpouseUserIds(f.getCreatorUserId());
+        return spouseIds != null && spouseIds.contains(userId);
     }
 
     private Set<Integer> parseVisibleToIds(String raw) {
@@ -156,7 +182,8 @@ public class MemoController {
         if (weekStr == null || weekStr.isBlank()) weekStr = "未知";
         String tagStr = tag != null && !tag.isBlank() ? tag : "日记";
         String contentStr = content != null ? content : "";
-        String promptStr = promptService.getUserPrompt("memo_inspire", "default",
+        String promptKey = isSpouseUser(userId) ? "memo_inspire_dad" : "memo_inspire";
+        String promptStr = promptService.getUserPrompt(promptKey, "default",
                 Map.of("week", weekStr, "tag", tagStr, "content", contentStr));
         if (promptStr == null || promptStr.isBlank()) {
             promptStr = "孕周：" + weekStr + "。标签：" + tagStr + "。用户已写内容：" + contentStr + "\n\n请生成一段孕期记录灵感或开头草稿（80～200 字），只输出正文。";
@@ -184,7 +211,8 @@ public class MemoController {
         if (text == null || text.getContent() == null || text.getContent().isBlank()) {
             return Result.error("无文字内容可美化");
         }
-        String promptStr = promptService.getUserPrompt("memo_beautify", "default", Map.of("content", text.getContent()));
+        String promptKey = isSpouseUser(memo.getUserId()) ? "memo_beautify_dad" : "memo_beautify";
+        String promptStr = promptService.getUserPrompt(promptKey, "default", Map.of("content", text.getContent()));
         if (promptStr == null || promptStr.isBlank()) {
             promptStr = "请将以下孕期记录美化润色，只输出美化后的正文：\n\n" + text.getContent();
         }
@@ -301,7 +329,8 @@ public class MemoController {
         String lastMenstrualDate = getLastMenstrualDate(userId);
         String pregnancyWeek = PregnancyWeekUtil.calculatePregnancyWeek(lastMenstrualDate);
         if (title == null || title.trim().isEmpty()) {
-            String promptStr = promptService.getUserPrompt("memo_file_title", "default",
+            String promptKey = isSpouseUser(userId) ? "memo_file_title_dad" : "memo_file_title";
+            String promptStr = promptService.getUserPrompt(promptKey, "default",
                     java.util.Map.of("fileName", file.getOriginalFilename() != null ? file.getOriginalFilename() : ""));
             if (promptStr == null || promptStr.isBlank()) promptStr = "请为上传的孕期文件生成一个简洁的标题（不超过20字），文件名：" + (file.getOriginalFilename() != null ? file.getOriginalFilename() : "");
             title = chatClient.prompt().user(promptStr).call().content();
@@ -458,6 +487,26 @@ public class MemoController {
     }
 
     // ========== 所有记录 ==========
+    /** 家庭记录：一次返回妈妈+爸爸的可见记录，用于时间轴分栏与筛选。返回 mom / dad 两个列表，前端合并并加 recordBy。 */
+    @RequestMapping("/getFamilyEnriched")
+    public Result<java.util.Map<String, List<Memo>>> getFamilyEnriched(@RequestParam("requestUserId") Integer requestUserId) {
+        com.anmory.yunji.entity.Family family = familyService.getMyFamily(requestUserId);
+        if (family == null || family.getCreatorUserId() == null) {
+            return Result.success(java.util.Map.of("mom", List.<Memo>of(), "dad", List.<Memo>of()));
+        }
+        Integer creatorUserId = family.getCreatorUserId();
+        List<Memo> momList = memoService.getAllMemoByUserIdPaged(creatorUserId, requestUserId, 10000, 0);
+        List<Integer> spouseIds = familyService.getSpouseUserIds(creatorUserId);
+        if (spouseIds == null || spouseIds.isEmpty()) {
+            return Result.success(java.util.Map.of("mom", momList != null ? momList : List.of(), "dad", List.<Memo>of()));
+        }
+        Integer spouseUserId = spouseIds.get(0);
+        List<Memo> dadList = memoService.getAllMemoByUserIdPaged(spouseUserId, requestUserId, 10000, 0);
+        return Result.success(java.util.Map.of(
+                "mom", momList != null ? momList : List.of(),
+                "dad", dadList != null ? dadList : List.of()));
+    }
+
     @RequestMapping("/getAllByUserId")
     public Result<List<Memo>> getAllByUserId(@RequestParam("userId") Integer userId,
                                             @RequestParam(value = "requestUserId", required = false) Integer requestUserId,
@@ -500,5 +549,89 @@ public class MemoController {
                 .contentType(MediaType.APPLICATION_PDF)
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename*=UTF-8''" + URLEncoder.encode(filename, StandardCharsets.UTF_8))
                 .body(bytes);
+    }
+
+    /** 导出 PDF 并异步发邮件，立即返回 202；失败时发站内通知 */
+    @PostMapping("/exportPdfToEmail")
+    public ResponseEntity<Result<Void>> exportPdfToEmail(@RequestParam("userId") Integer userId,
+                                                         @RequestParam(value = "email", required = false) String emailParam,
+                                                         @RequestParam(value = "scope", defaultValue = "both") String scope,
+                                                         @RequestParam(value = "fromDate", required = false) String fromDateStr,
+                                                         @RequestParam(value = "toDate", required = false) String toDateStr) {
+        User user = userService.getById(userId);
+        if (user == null) {
+            return ResponseEntity.badRequest().body(Result.error("用户不存在"));
+        }
+        String toEmail = (emailParam != null && !emailParam.isBlank()) ? emailParam.trim() : (user.getEmail() != null && !user.getEmail().isBlank() ? user.getEmail().trim() : null);
+        if (toEmail == null || !toEmail.contains("@")) {
+            userNotificationService.notifySystem(userId, "导出失败", "请先绑定邮箱后再导出 PDF。");
+            return ResponseEntity.badRequest().body(Result.error("请先绑定邮箱"));
+        }
+        LocalDate fromDate = null;
+        LocalDate toDate = null;
+        if (fromDateStr != null && !fromDateStr.isBlank()) {
+            try { fromDate = LocalDate.parse(fromDateStr); } catch (Exception ignored) {}
+        }
+        if (toDateStr != null && !toDateStr.isBlank()) {
+            try { toDate = LocalDate.parse(toDateStr); } catch (Exception ignored) {}
+        }
+        final String to = toEmail;
+        final String scopeFinal = "mom".equals(scope) || "dad".equals(scope) ? scope : "both";
+        final LocalDate from = fromDate;
+        final LocalDate toDateLimit = toDate;
+        CompletableFuture.runAsync(() -> {
+            try {
+                List<EnrichedMemoItem> items = new ArrayList<>();
+                String pdfUsername = user.getUsername() != null ? user.getUsername() : "用户";
+                com.anmory.yunji.entity.Family family = familyService.getMyFamily(userId);
+                Integer creatorUserId = (family != null && family.getCreatorUserId() != null) ? family.getCreatorUserId() : userId;
+                List<Integer> spouseIds = family != null ? familyService.getSpouseUserIds(creatorUserId) : List.of();
+                Integer spouseUserId = (spouseIds != null && !spouseIds.isEmpty()) ? spouseIds.get(0) : null;
+                if ("mom".equals(scopeFinal) || "both".equals(scopeFinal)) {
+                    List<EnrichedMemoItem> momItems = pdfExportService.loadEnrichedItems(creatorUserId);
+                    momItems.forEach(i -> i.setRecordBy("mom"));
+                    items.addAll(momItems);
+                }
+                if ("dad".equals(scopeFinal) || "both".equals(scopeFinal)) {
+                    if (spouseUserId != null) {
+                        List<EnrichedMemoItem> dadItems = pdfExportService.loadEnrichedItems(spouseUserId);
+                        dadItems.forEach(i -> i.setRecordBy("dad"));
+                        items.addAll(dadItems);
+                    }
+                }
+                items.sort((a, b) -> {
+                    if (a.getCreatedAt() == null) return 1;
+                    if (b.getCreatedAt() == null) return -1;
+                    return a.getCreatedAt().compareTo(b.getCreatedAt());
+                });
+                if (from != null || toDateLimit != null) {
+                    items = items.stream().filter(item -> {
+                        if (item.getCreatedAt() == null) return false;
+                        LocalDate d = item.getCreatedAt().toLocalDate();
+                        if (from != null && d.isBefore(from)) return false;
+                        if (toDateLimit != null && d.isAfter(toDateLimit)) return false;
+                        return true;
+                    }).collect(java.util.stream.Collectors.toList());
+                }
+                if (items.isEmpty()) {
+                    pdfUsername = pdfUsername + "-空";
+                }
+                ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                pdfExportService.exportToPdf(items, pdfUsername, baos);
+                byte[] pdfBytes = baos.toByteArray();
+                String pdfUrl = aliOssUtil.uploadExportPdf(userId, pdfBytes);
+                String htmlContent = com.anmory.yunji.service.impl.MailServiceImpl.wrapHtmlBody(
+                    "<p style=\"margin:0 0 16px;font-size:15px;\">您的孕期记录 PDF 已生成。</p>"
+                    + "<p style=\"margin:0 0 16px;font-size:15px;\"><a href=\"" + pdfUrl + "\" style=\"color:#c86b5a;text-decoration:underline;\">点击此处下载 PDF</a></p>"
+                    + "<p style=\"margin:0;font-size:13px;color:#787673;\">链接 7 天内有效，请及时保存。</p>"
+                );
+                mailService.sendHtmlMail(to, "您的孕期记录 PDF 已生成", htmlContent);
+                log.info("[导出] PDF 已上传 OSS 并发邮件链接 userId={} to={}", userId, to);
+            } catch (Exception e) {
+                log.warn("[导出] PDF 导出或发邮件失败 userId={}", userId, e);
+                userNotificationService.notifySystem(userId, "导出失败", "孕期记录 PDF 导出失败，请稍后重试。");
+            }
+        });
+        return ResponseEntity.status(org.springframework.http.HttpStatus.ACCEPTED).body(Result.success(null));
     }
 }

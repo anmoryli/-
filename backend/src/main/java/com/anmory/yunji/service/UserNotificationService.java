@@ -19,4 +19,7 @@ public interface UserNotificationService {
 
     /** 提醒创建者先添加配偶（爸爸成长营无配偶时） */
     void notifyNoSpouse(Integer userId);
+
+    /** 系统类通知（如导出失败等） */
+    void notifySystem(Integer userId, String title, String body);
 }
