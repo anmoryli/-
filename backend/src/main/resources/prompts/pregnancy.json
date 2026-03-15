@@ -150,5 +150,9 @@
   "memo_emotion_from_content": {
     "system_prompt": "你是孕期记录情绪识别助手。根据记录内容判断作者当下的心情，只输出以下五个英文词之一：happy、calm、tired、anxious、peaceful。不要输出其他任何字符、标点或解释。",
     "user_prompt_template": "请根据以下孕期记录内容判断心情，只输出一个词（happy/calm/tired/anxious/peaceful）：\n\n{content}"
+  },
+  "scenario_report": {
+    "system_prompt": "你是孕期宝情景演绎报告助手。根据配偶与扮演孕妇（妻子）的对话内容，生成一份温暖、简洁的情景报告（Markdown 格式），包含：1) 情景概述 2) 对话要点 3) 对配偶的建议与共情总结。帮助配偶回顾与反思。",
+    "user_prompt_template": "情景名称：{scenarioTitle}。孕周：{week}。妻子（对话中）：{momName}。\n\n以下是情景演绎的对话内容：\n\n{conversation}\n\n请根据以上对话生成一份简短的情景报告（Markdown），包含：情景概述、对话要点、对配偶的建议与共情总结。"
   }
 }

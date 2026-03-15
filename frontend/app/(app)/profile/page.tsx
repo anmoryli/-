@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import { addMonths } from "date-fns"
 import {
   Calendar,
   ChevronRight,
@@ -21,6 +22,7 @@ import {
   Wind,
   FileText,
   ListTodo,
+  Theater,
 } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import { updatePregnancy, updateUsername, uploadAvatar, updateAvatar } from "@/lib/api/user"
@@ -87,18 +89,25 @@ export default function ProfilePage() {
       .finally(() => setLoadingRecords(false))
   }, [user])
 
-  // 家庭成员：拉取孕妇的怀孕进度
+  // 家庭成员或孕妇本人：拉取怀孕进度与记录统计（总/妈/爸）
   useEffect(() => {
-    if (!user || user.userType !== "family_member") {
+    if (!user) {
+      setCreatorPregnancy(null)
+      return
+    }
+    if (user.userType !== "family_member" && user.userType !== "pregnant") {
       setCreatorPregnancy(null)
       return
     }
     getCreatorPregnancy(user.userId)
       .then((data) => {
-        if (data && (data.lastMenstrualDate || data.pregnancyTime))
+        if (data && (data.lastMenstrualDate || data.pregnancyTime || typeof data.recordCount === "number"))
           setCreatorPregnancy({
             creatorUsername: data.creatorUsername || "孕妇",
             recordCount: data.recordCount ?? 0,
+            recordCountTotal: data.recordCountTotal,
+            recordCountMom: data.recordCountMom,
+            recordCountDad: data.recordCountDad,
             lastMenstrualDate: data.lastMenstrualDate ?? null,
             pregnancyTime: data.pregnancyTime ?? null,
           })
@@ -192,15 +201,19 @@ export default function ProfilePage() {
     toast.success("已退出登录")
   }
 
+  const recordDisplay =
+    (user.userType === "family_member" || user.userType === "pregnant") && creatorPregnancy && typeof creatorPregnancy.recordCountTotal === "number"
+      ? `共 ${creatorPregnancy.recordCountTotal} 条 · 妈妈 ${creatorPregnancy.recordCountMom ?? 0} · 爸爸 ${creatorPregnancy.recordCountDad ?? 0}`
+      : user.userType === "family_member" && creatorPregnancy
+        ? (creatorPregnancy.recordCount ?? "-")
+        : loadingRecords
+          ? "-"
+          : records.length
+
   const stats = [
     {
       label: "孕期记录",
-      value:
-        user.userType === "family_member"
-          ? (creatorPregnancy?.recordCount ?? "-")
-          : loadingRecords
-            ? "-"
-            : records.length,
+      value: recordDisplay,
       icon: BookOpen,
       color: "border-[var(--accent-1)]/30 bg-[var(--accent-1-muted)] text-[var(--accent-1)]",
     },
@@ -231,10 +244,11 @@ export default function ProfilePage() {
       { label: "孕期百科", icon: FileText, href: "/articles" },
       { label: "爸爸成长营", icon: ListTodo, href: "/tasks" },
     ] : []),
+    ...(user.isSpouse === true ? [{ label: "情景演绎", icon: Theater, href: "/scenario" }] : []),
     { label: "站内消息", icon: Bell, href: "/notifications" },
     ...(user.userType === "pregnant" ? [{ label: "我的模板作品", icon: Star, href: "/profile/my-posts" }] : []),
-    { label: "家人共享", icon: Users, href: "/family" },
-    { label: user?.email ? "绑定邮箱（已绑定）" : "绑定邮箱", icon: Mail, href: "/profile/bind-email" },
+    { label: "我们的小家", icon: Users, href: "/family" },
+    { label: user?.email ? "邮箱（已绑定）" : "邮箱与安全", icon: Mail, href: "/profile/bind-email" },
     { label: "修改密码", icon: KeyRound, href: "/profile/change-password" },
     { label: "消息通知", icon: Bell, href: "/profile/notifications" },
     { label: "隐私设置", icon: Shield, href: "/profile/privacy" },
@@ -344,24 +358,35 @@ export default function ProfilePage() {
                     )}
                   </div>
                 </div>
-                {user.userType === "pregnant" && (
-                  <>
-                    <div>
-                      <DateInput
-                        label="怀孕日（末次月经）"
-                        value={editLastMenstrualDate}
-                        onChange={setEditLastMenstrualDate}
-                      />
-                    </div>
-                    <div>
-                      <DateInput
-                        label="预产期"
-                        value={editDueDate}
-                        onChange={setEditDueDate}
-                      />
-                    </div>
-                  </>
-                )}
+                {user.userType === "pregnant" && (() => {
+                  const pregnancyStart = editLastMenstrualDate && /^\d{4}-\d{2}-\d{2}$/.test(editLastMenstrualDate) ? editLastMenstrualDate : null
+                  const today = new Date()
+                  const todayStr = today.toISOString().split("T")[0]
+                  const dueMin = pregnancyStart ?? todayStr
+                  const dueMax = pregnancyStart
+                    ? addMonths(new Date(pregnancyStart + "T00:00:00"), 13).toISOString().split("T")[0]
+                    : addMonths(today, 13).toISOString().split("T")[0]
+                  return (
+                    <>
+                      <div>
+                        <DateInput
+                          label="怀孕日（末次月经）"
+                          value={editLastMenstrualDate}
+                          onChange={setEditLastMenstrualDate}
+                        />
+                      </div>
+                      <div>
+                        <DateInput
+                          label="预产期"
+                          value={editDueDate}
+                          onChange={setEditDueDate}
+                          min={dueMin}
+                          max={dueMax}
+                        />
+                      </div>
+                    </>
+                  )
+                })()}
                 <Button
                   onClick={handleSave}
                   disabled={saving}
@@ -380,23 +405,26 @@ export default function ProfilePage() {
       <div className="mt-6 grid grid-cols-3 gap-3">
         {stats.map((stat) => {
           const Icon = stat.icon
+          const isRecordStat = stat.label === "孕期记录"
           return (
             <div
               key={stat.label}
-              className="card-elevated flex flex-col items-center gap-2 rounded-xl py-4"
+              className="card-elevated flex min-w-0 flex-col items-center gap-2 rounded-xl py-4"
             >
               <div
-                className={`flex h-10 w-10 items-center justify-center rounded-lg border ${stat.color}`}
+                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border ${stat.color}`}
               >
                 <Icon className="h-5 w-5" strokeWidth={1.75} />
               </div>
-              <span className="text-[1.25rem] font-bold text-[var(--foreground)]">
+              <span
+                className={`min-w-0 max-w-full break-words text-center font-bold text-[var(--foreground)] ${isRecordStat ? "text-sm leading-tight" : "text-[1.25rem]"}`}
+              >
                 {stat.value}
                 {stat.suffix && stat.value !== "-" && (
                   <span className="text-caption font-normal">{stat.suffix}</span>
                 )}
               </span>
-              <span className="text-micro">{stat.label}</span>
+              <span className="text-micro shrink-0">{stat.label}</span>
             </div>
           )
         })}

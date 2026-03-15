@@ -7,7 +7,7 @@ import {
   getWeeklyTip as getStaticTip,
   getCountdownMessage,
 } from "@/lib/pregnancy"
-import { getWeeklyTip as getAiTip } from "@/lib/api/ai"
+import { getWeeklyReminder, getWeeklyTip as getAiTip } from "@/lib/api/ai"
 import { Calendar, Heart, Leaf } from "lucide-react"
 
 interface PregnancyCardProps {
@@ -24,9 +24,9 @@ export function PregnancyCard({ lastMenstrualDate, dueDate, userId }: PregnancyC
 
   useEffect(() => {
     if (userId && info.weeksPregnant >= 4) {
-      getAiTip(userId, info.weeksPregnant)
+      getWeeklyReminder(userId, info.weeksPregnant)
         .then((t) => t && setTip(t))
-        .catch(() => {})
+        .catch(() => getAiTip(userId, info.weeksPregnant).then((t) => t && setTip(t)).catch(() => {}))
     }
   }, [userId, info.weeksPregnant])
 
@@ -105,7 +105,7 @@ export function PregnancyCard({ lastMenstrualDate, dueDate, userId }: PregnancyC
         }}
       >
         <p className="text-caption leading-relaxed text-[var(--foreground)]">
-          <span className="font-medium text-[var(--accent-3)]">本周提示</span>
+          <span className="font-medium text-[var(--accent-3)]">本周小贴士</span>
           <span className="ml-1.5">{tip}</span>
         </p>
       </div>

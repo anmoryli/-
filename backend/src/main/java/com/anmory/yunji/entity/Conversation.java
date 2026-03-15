@@ -25,6 +25,11 @@ public class Conversation {
     private Integer memoId;
 
     /**
+     * 情景演绎时关联 scenario 表
+     */
+    private Integer scenarioId;
+
+    /**
      * 对话标题，非空
      */
     private String title;

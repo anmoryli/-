@@ -244,7 +244,8 @@ export async function addVoice(
   if (options?.visibilityMode) extra.visibilityMode = options.visibilityMode
   if (options?.visibleTo) extra.visibleTo = options.visibleTo
   if (options?.category) extra.category = options.category
-  return apiUpload<VoiceMemo>("/api/memo/addVoice", { key: "file", file }, extra)
+  const path = "/api/memo/addVoice?userId=" + userId
+  return apiUpload<VoiceMemo>(path, { key: "file", file }, extra)
 }
 
 /** 删除语音记录 */
@@ -285,7 +286,8 @@ export async function addFile(
   if (options?.visibilityMode) extra.visibilityMode = options.visibilityMode
   if (options?.visibleTo) extra.visibleTo = options.visibleTo
   if (options?.category) extra.category = options.category
-  return apiUpload<FileMemo>("/api/memo/addFile", { key: "file", file }, extra)
+  const path = "/api/memo/addFile?userId=" + userId
+  return apiUpload<FileMemo>(path, { key: "file", file }, extra)
 }
 
 /** 删除文件记录 */
@@ -484,6 +486,55 @@ export async function getAllEnriched(userId: number, requestUserId?: number): Pr
     const tb = b.createTime ? new Date(b.createTime).getTime() : 0
     return tb - ta
   })
+}
+
+/** 按 ID 获取单条记录（含权限校验），用于详情页在列表中未命中时的回退。404 或无权限时返回 null。 */
+export async function getRecordById(memoId: number, requestUserId: number): Promise<MemoItem | null> {
+  log("getRecordById", { memoId, requestUserId })
+  if (USE_MOCK) return null
+  try {
+    const data = await apiGet<Record<string, unknown>>("/api/memo/getById", {
+      memoId: String(memoId),
+      requestUserId: String(requestUserId),
+    })
+    if (!data || data.memoId == null) return null
+    const type = (data.type === "text" || data.type === "voice" || data.type === "file" || data.type === "photo"
+      ? data.type
+      : "text") as MemoItem["type"]
+    const item: MemoItem = {
+      id: Number(data.memoId),
+      type,
+      tag: data.tag as string | undefined,
+      createTime: data.createdAt as string | undefined,
+      pregnancyWeek: data.pregnancyWeek as string | undefined,
+      pregnancyWeekIndex: data.pregnancyWeekIndex as number | undefined,
+      recordWeightKg: data.recordWeightKg as number | undefined,
+      mood: data.mood as string | undefined,
+      category: data.category as string | undefined,
+      photoDescription: data.photoDescription as string | undefined,
+      visibilityMode: data.visibilityMode as MemoItem["visibilityMode"],
+      visibleTo: data.visibleTo as string | undefined,
+      recordBy: data.recordBy as "mom" | "dad" | undefined,
+    }
+    if (type === "text") {
+      item.title = data.title as string | undefined
+      item.content = data.content as string | undefined
+      item.textId = data.textId as number | undefined
+    } else if (type === "voice") {
+      item.title = data.title as string | undefined
+      item.voiceUrl = data.voiceUrl as string | undefined
+      item.voiceId = data.voiceId as number | undefined
+    } else if (type === "photo") {
+      item.photoUrls = Array.isArray(data.photoUrls) ? (data.photoUrls as string[]) : []
+    } else if (type === "file") {
+      item.title = data.title as string | undefined
+      item.fileUrl = data.fileUrl as string | undefined
+      item.fileId = data.fileId as number | undefined
+    }
+    return item
+  } catch {
+    return null
+  }
 }
 
 /** 家庭记录：妈妈+爸爸合并列表，每条带 recordBy。有家庭且为家庭成员时使用。 */

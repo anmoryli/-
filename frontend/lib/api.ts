@@ -139,20 +139,45 @@ export async function apiGet<T>(
   }
 }
 
+/** 可选：请求超时（毫秒），用于长耗时接口如情景结束生成报告 */
+export interface ApiPostJsonOptions {
+  timeoutMs?: number
+}
+
 /**
  * POST request with JSON body
  */
-export async function apiPostJson<T>(path: string, body: unknown): Promise<T> {
+export async function apiPostJson<T>(
+  path: string,
+  body: unknown,
+  options?: ApiPostJsonOptions
+): Promise<T> {
   const url = `${BASE_URL}${path}`
-  log("request", "POST JSON", url)
+  log("request", "POST JSON", url, options?.timeoutMs ? `timeout=${options.timeoutMs}ms` : "")
+  const timeoutMs = options?.timeoutMs
+  const controller =
+    typeof AbortController !== "undefined" && timeoutMs != null && timeoutMs > 0
+      ? new AbortController()
+      : null
+  const timeoutId =
+    controller != null && timeoutMs != null
+      ? setTimeout(() => controller.abort(), timeoutMs)
+      : undefined
   try {
     const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
+      signal: controller?.signal,
     })
+    if (timeoutId != null) clearTimeout(timeoutId)
     return await handleResponse<T>(res, url, "POST")
   } catch (e) {
+    if (timeoutId != null) clearTimeout(timeoutId)
+    if (e instanceof Error && e.name === "AbortError") {
+      log("error", "apiPostJson timeout", path, timeoutMs)
+      throw new Error("请求超时，请稍后重试")
+    }
     log("error", "apiPostJson failed", path, e)
     throw e
   }

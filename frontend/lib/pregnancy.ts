@@ -33,7 +33,7 @@ export function getPregnancyInfo(lastMenstrualDateStr: string, dueDateStr?: stri
     dueDate,
     daysPassed,
     daysRemaining,
-    weeksPregnant: Math.min(weeksPregnant, 42),
+    weeksPregnant: Math.min(weeksPregnant, 52),
     daysInCurrentWeek,
     progress,
     trimester,
@@ -82,8 +82,9 @@ export function getBabySize(week: number): { name: string; size: string } {
     40: { name: "大西瓜", size: "51.2cm" },
   }
 
-  const clampedWeek = Math.min(Math.max(week, 4), 40)
-  return sizes[clampedWeek] || { name: "小宝贝", size: "成长中" }
+  const clampedWeek = Math.min(Math.max(week, 4), 52)
+  const key = Math.min(clampedWeek, 40)
+  return sizes[key] || { name: "小宝贝", size: "成长中" }
 }
 
 export function getWeeklyTip(week: number): string {
@@ -127,8 +128,9 @@ export function getWeeklyTip(week: number): string {
     40: "预产期到了，宝宝即将到来",
   }
 
-  const clampedWeek = Math.min(Math.max(week, 4), 40)
-  return tips[clampedWeek] || "保持好心情，注意均衡饮食"
+  const clampedWeek = Math.min(Math.max(week, 4), 52)
+  const key = Math.min(clampedWeek, 40)
+  return tips[key] || "保持好心情，注意均衡饮食"
 }
 
 /** 每日温暖一句：提升幸福感的温馨语录，按日期轮换 */

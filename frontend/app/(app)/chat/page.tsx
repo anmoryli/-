@@ -13,9 +13,11 @@ import {
   getConversationHistory,
   getDailyWarm,
   deleteConversation,
+  markConversationRead,
   type Conversation,
   type ChatMessage,
 } from "@/lib/api/ai"
+import { endScenario } from "@/lib/api/scenario"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 import { MarkdownView } from "@/components/markdown-view"
@@ -157,9 +159,15 @@ export default function ChatPage() {
   const searchParams = useSearchParams()
   const prefillQ = searchParams.get("q")
   const prefillPrompt = searchParams.get("prompt") // 制作同款：仅填入输入框，不自动发送
+  const scenarioConversationId = searchParams.get("conversationId")
+    ? Number(searchParams.get("conversationId"))
+    : null
+  const isScenarioMode = searchParams.get("mode") === "scenario"
 
   // 视图状态：list 显示历史列表，chat 显示对话（制作同款带 prompt 时直接进对话页）
-  const [view, setView] = useState<"list" | "chat">(prefillQ || prefillPrompt ? "chat" : "list")
+  const [view, setView] = useState<"list" | "chat">(
+    prefillQ || prefillPrompt || (scenarioConversationId != null && isScenarioMode) ? "chat" : "list"
+  )
   
   // 会话列表
   const [conversations, setConversations] = useState<Conversation[]>([])
@@ -184,8 +192,14 @@ export default function ChatPage() {
   
   // 删除确认
   const [deleteTarget, setDeleteTarget] = useState<Conversation | null>(null)
-  
+  /** 情景演绎：结束情景并生成报告中 */
+  const [endingScenario, setEndingScenario] = useState(false)
+  /** 情景演绎：AI 建议结束，展示确认条 */
+  const [showScenarioEndSuggest, setShowScenarioEndSuggest] = useState(false)
+
   const scrollRef = useRef<HTMLDivElement>(null)
+
+  const isScenarioSession = currentConversation?.scenarioId != null
 
   const canUseChat = user && (user.userType === "pregnant" || user.isSpouse === true)
   useEffect(() => {
@@ -195,15 +209,18 @@ export default function ChatPage() {
     }
   }, [user, canUseChat, router])
 
-  // 加载会话列表
-  const loadConversations = async () => {
-    if (!user) return
+  // 加载会话列表（返回列表供情景入口使用）
+  const loadConversations = async (): Promise<Conversation[]> => {
+    if (!user) return []
     setLoadingConversations(true)
     try {
       const list = await getConversationList(user.userId)
-      setConversations(list || [])
+      const arr = list || []
+      setConversations(arr)
+      return arr
     } catch {
       setConversations([])
+      return []
     } finally {
       setLoadingConversations(false)
     }
@@ -212,6 +229,57 @@ export default function ChatPage() {
   useEffect(() => {
     loadConversations()
   }, [user])
+
+  // 情景演绎入口：/chat?conversationId=xxx&mode=scenario — 优先用 sessionStorage 的开场白，否则拉会话列表后打开
+  const scenarioOpenDoneRef = useRef(false)
+  const scenarioProcessedConvIdRef = useRef<number | null>(null)
+  useEffect(() => {
+    if (!user || scenarioConversationId == null || !isScenarioMode) return
+    // 每次进入新的情景会话都允许处理（避免从列表再进情景时 ref 仍为 true 导致不跳转）
+    if (scenarioProcessedConvIdRef.current !== scenarioConversationId) {
+      scenarioOpenDoneRef.current = false
+      scenarioProcessedConvIdRef.current = scenarioConversationId
+    }
+    if (scenarioOpenDoneRef.current) return
+    scenarioOpenDoneRef.current = true
+    const stored = typeof sessionStorage !== "undefined" ? sessionStorage.getItem("yunqi_scenario_pending") : null
+    let parsed: { conversationId: number; title: string; scenarioId: number; openingContent: string } | null = null
+    if (stored) {
+      try {
+        parsed = JSON.parse(stored) as typeof parsed
+      } catch {
+        // ignore
+      }
+    }
+    if (parsed && parsed.conversationId === scenarioConversationId) {
+      sessionStorage.removeItem("yunqi_scenario_pending")
+      setCurrentConversation({
+        conversationId: parsed.conversationId,
+        userId: user.userId,
+        title: parsed.title,
+        scenarioId: parsed.scenarioId,
+      })
+      setMessages([
+        {
+          id: `opening-${parsed.conversationId}`,
+          role: "assistant",
+          content: parsed.openingContent || "来聊聊吧～",
+        },
+      ])
+      setView("chat")
+      window.history.replaceState({}, "", "/chat")
+      return
+    }
+    loadConversations().then(async (list) => {
+      const conv = list.find((c) => c.conversationId === scenarioConversationId)
+      if (conv) {
+        await openConversation(conv)
+        setView("chat")
+        window.history.replaceState({}, "", "/chat")
+      }
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once for scenario entry
+  }, [user, scenarioConversationId, isScenarioMode])
 
   // 支持 /chat?q=xxx 自动发起问题（如记录灵感、本周小结入口）
   const prefillSentRef = useRef(false)
@@ -322,7 +390,7 @@ export default function ChatPage() {
     if (!user) return
     setCurrentConversation(conv)
     setView("chat")
-    
+    setShowScenarioEndSuggest(false)
     try {
       const history = await getConversationHistory(user.userId, conv.conversationId)
       const msgs: Message[] = (history || []).map((m: ChatMessage) => ({
@@ -331,16 +399,42 @@ export default function ChatPage() {
         content: m.content,
       }))
       setMessages(msgs)
+      markConversationRead(user.userId, conv.conversationId).catch(() => {})
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.conversationId === conv.conversationId ? { ...c, hasUnreadAi: false } : c
+        )
+      )
+      window.dispatchEvent(new Event("chat-conversation-read"))
       setTimeout(() => scrollToBottom(), 120)
     } catch {
       setMessages([])
     }
   }
 
-  // 返回列表
+  // 返回列表（情景会话时返回情景首页）
   const backToList = () => {
+    if (isScenarioSession) {
+      router.push("/scenario")
+      return
+    }
     setView("list")
     loadConversations()
+  }
+
+  // 结束情景并生成报告
+  const handleEndScenario = async () => {
+    if (!user || !currentConversation?.conversationId || endingScenario) return
+    setEndingScenario(true)
+    try {
+      const report = await endScenario(user.userId, currentConversation.conversationId, "user_confirm")
+      toast.success("情景报告已生成")
+      router.push(`/scenario/reports/${report.reportId}`)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "结束情景失败")
+    } finally {
+      setEndingScenario(false)
+    }
   }
 
   // 删除会话
@@ -387,8 +481,10 @@ export default function ChatPage() {
     setPreviewUrls([])
     if (imageInputRef.current) imageInputRef.current.value = ""
     setIsTyping(true)
-    setIsIntentRecognizing(true)
-    setIntentAnchorMessageId(userMsg.id)
+    if (!isScenarioSession) {
+      setIsIntentRecognizing(true)
+      setIntentAnchorMessageId(userMsg.id)
+    }
     scrollToBottom()
 
     const aiMsgId = `ai-${Date.now()}`
@@ -409,19 +505,28 @@ export default function ChatPage() {
       }
 
       let hasReceivedChunk = false
-      await chatStream(user.userId, convId, text.trim(), (chunk) => {
-        if (!hasReceivedChunk) {
-          hasReceivedChunk = true
-          setIsIntentRecognizing(false)
-          setIntentAnchorMessageId(null)
-        }
-        const normalizedChunk = chunk.replace(/\r/g, "").replace(/\\n/g, "\n")
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === aiMsgId ? { ...m, content: m.content + normalizedChunk } : m
+      setShowScenarioEndSuggest(false)
+      await chatStream(
+        user.userId,
+        convId,
+        text.trim(),
+        (chunk) => {
+          if (!hasReceivedChunk) {
+            hasReceivedChunk = true
+            setIsIntentRecognizing(false)
+            setIntentAnchorMessageId(null)
+          }
+          const normalizedChunk = chunk.replace(/\r/g, "").replace(/\\n/g, "\n")
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === aiMsgId ? { ...m, content: m.content + normalizedChunk } : m
+            )
           )
-        )
-      }, images, user.userType === "pregnant" && publishImageToCommunity && images.length === 1)
+        },
+        images,
+        user.userType === "pregnant" && publishImageToCommunity && images.length === 1,
+        isScenarioSession ? () => setShowScenarioEndSuggest(true) : undefined
+      )
       // 流式结束后立即使用后端持久化内容回填，避免必须退出重进才渲染正常
       try {
         const history = await getConversationHistory(user.userId, convId)
@@ -478,9 +583,9 @@ export default function ChatPage() {
             className="text-[1.2rem] font-semibold text-[var(--foreground)]"
             style={{ fontFamily: "var(--font-serif)" }}
           >
-            记录助手
+            孕期小伴
           </h1>
-          <p className="mt-1 text-caption">帮您整理记录、写信给宝宝、回顾时光</p>
+          <p className="mt-1 text-caption">陪你整理记录、写信给宝宝、回顾时光</p>
         </div>
 
         {/* Conversation List */}
@@ -500,7 +605,7 @@ export default function ChatPage() {
                 暂无历史对话
               </h2>
               <p className="mt-2 max-w-xs text-caption">
-                记录助手陪伴你记录孕期点滴，点击下方开始新对话
+                孕期小伴陪你记录孕期点滴，点击下方开始新对话
               </p>
               <button
                 onClick={startNewChat}
@@ -527,8 +632,11 @@ export default function ChatPage() {
                       onClick={() => openConversation(conv)}
                       className="flex min-w-0 flex-1 items-start gap-3 text-left"
                     >
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[var(--accent-1)]/30 bg-[var(--accent-1-muted)]">
+                      <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[var(--accent-1)]/30 bg-[var(--accent-1-muted)]">
                         <Bot className="h-5 w-5 text-[var(--accent-1)]" strokeWidth={1.75} />
+                        {conv.hasUnreadAi && (
+                          <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-[var(--critical)]" aria-label="未读" />
+                        )}
                       </div>
                       <div className="min-w-0 flex-1 overflow-hidden">
                         <p className="truncate text-[15px] font-medium text-[var(--foreground)]">
@@ -609,7 +717,7 @@ export default function ChatPage() {
         <div className="flex items-center gap-3">
           <button
             onClick={backToList}
-            className="flex h-10 w-10 items-center justify-center rounded-lg border border-[var(--card-border)] bg-[var(--card)] text-[var(--foreground-muted)] transition-colors active:bg-[var(--muted)]"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[var(--card-border)] bg-[var(--card)] text-[var(--foreground-muted)] transition-colors active:bg-[var(--muted)]"
             aria-label="返回"
           >
             <ChevronLeft className="h-5 w-5" strokeWidth={1.75} />
@@ -618,8 +726,19 @@ export default function ChatPage() {
             className="min-w-0 flex-1 truncate text-[1.1rem] font-semibold text-[var(--foreground)]"
             style={{ fontFamily: "var(--font-serif)" }}
           >
-            {currentConversation?.title || "新对话"}
+            {isScenarioSession
+              ? `情景：${currentConversation?.title ?? "情景演绎"}`
+              : currentConversation?.title || "新对话"}
           </h1>
+          {isScenarioSession && (
+            <button
+              onClick={handleEndScenario}
+              disabled={endingScenario}
+              className="shrink-0 rounded-lg border border-[var(--accent-2)]/50 bg-[var(--accent-2-muted)] px-3 py-2 text-[13px] font-medium text-[var(--accent-2)] transition-colors active:opacity-90 disabled:opacity-60"
+            >
+              {endingScenario ? "生成中…" : "结束情景"}
+            </button>
+          )}
         </div>
       </div>
 
@@ -636,10 +755,10 @@ export default function ChatPage() {
               </p>
             )}
             <h2 className="mt-6 text-[1.05rem] font-semibold text-[var(--foreground)]">
-              记录助手
+              孕期小伴
             </h2>
             <p className="mt-2 max-w-xs text-caption">
-              您好！我是您的记录陪伴助手，可以帮您整理记录、写信给宝宝、回顾时光。
+              你好呀～我是你的孕期小伴，可以陪你整理记录、写信给宝宝、回顾时光。
             </p>
             <div className="mt-8 w-full max-w-sm">
               <p className="mb-2 text-micro font-medium">试试问我</p>
@@ -675,6 +794,28 @@ export default function ChatPage() {
 
       {/* Input — 固定在底部、导航栏上方 */}
       <div className="fixed left-0 right-0 bottom-20 z-30 mx-auto max-w-lg border-t border-[var(--card-border)] bg-[var(--card)]/98 backdrop-blur-sm px-4 py-3 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6 sm:py-4">
+        {isScenarioSession && showScenarioEndSuggest && (
+          <div className="mb-3 flex items-center justify-between gap-2 rounded-xl border border-[var(--accent-2)]/40 bg-[var(--accent-2-muted)] px-3 py-2">
+            <span className="text-[13px] text-[var(--foreground)]">AI 建议结束情景，是否生成报告？</span>
+            <div className="flex shrink-0 gap-2">
+              <button
+                type="button"
+                onClick={() => setShowScenarioEndSuggest(false)}
+                className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] px-2.5 py-1.5 text-[12px] font-medium text-[var(--foreground-muted)]"
+              >
+                继续对话
+              </button>
+              <button
+                type="button"
+                onClick={handleEndScenario}
+                disabled={endingScenario}
+                className="rounded-lg border border-[var(--accent-2)]/50 bg-[var(--accent-2)] px-2.5 py-1.5 text-[12px] font-medium text-[var(--foreground)] disabled:opacity-60"
+              >
+                {endingScenario ? "生成中…" : "结束并生成报告"}
+              </button>
+            </div>
+          </div>
+        )}
         {previewUrls.length > 0 && (
           <div className="mb-3 grid grid-cols-2 gap-2">
             {previewUrls.map((url, idx) => (
@@ -729,7 +870,13 @@ export default function ChatPage() {
                   sendMessage(input, selectedImages)
                 }
               }}
-              placeholder={isTemplateMakingMode ? "请输入提示词并上传一张图片" : "输入消息..."}
+              placeholder={
+                isTemplateMakingMode
+                  ? "请输入提示词并上传一张图片"
+                  : isScenarioSession
+                    ? "输入消息… 结束可点「结束情景」生成报告"
+                    : "输入消息..."
+              }
               rows={1}
               className="min-h-[44px] w-full resize-none rounded-xl border border-[var(--card-border)] bg-[var(--background)] py-3 pl-4 pr-4 text-body leading-tight placeholder:text-[var(--foreground-muted)] focus:border-[var(--accent-1)] focus:outline-none"
             />

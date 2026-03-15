@@ -2,24 +2,41 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { useEffect, useState } from "react"
 import { Home, BookOpen, MessageCircle, User, Sparkles } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/lib/auth-context"
+import { getConversationHasUnread } from "@/lib/api/ai"
 
 const baseNavItems = [
   { href: "/", label: "首页", icon: Home, match: (p: string) => p === "/" },
   { href: "/records", label: "记录", icon: BookOpen, match: (p: string) => p === "/records" || p.startsWith("/records/") },
   { href: "/community", label: "社区", icon: Sparkles, match: (p: string) => p === "/community" || p.startsWith("/community") },
-  { href: "/chat", label: "记录助手", icon: MessageCircle, match: (p: string) => p === "/chat" || p.startsWith("/chat") },
+  { href: "/chat", label: "孕期小伴", icon: MessageCircle, match: (p: string) => p === "/chat" || p.startsWith("/chat") },
   { href: "/profile", label: "我的", icon: User, match: (p: string) => p === "/profile" || p.startsWith("/profile/") },
 ]
 
 export function BottomNav() {
   const pathname = usePathname() ?? ""
+  const [chatHasUnread, setChatHasUnread] = useState(false)
+  const { user } = useAuth()
+
+  const canUseChat = user && (user.userType === "pregnant" || user.isSpouse === true)
+  useEffect(() => {
+    if (!canUseChat || !user?.userId) return
+    getConversationHasUnread(user.userId)
+      .then(setChatHasUnread)
+      .catch(() => setChatHasUnread(false))
+  }, [canUseChat, user?.userId, pathname])
+
+  useEffect(() => {
+    const onRead = () => setChatHasUnread(false)
+    window.addEventListener("chat-conversation-read", onRead)
+    return () => window.removeEventListener("chat-conversation-read", onRead)
+  }, [])
+
   if (pathname === "/admin" || pathname?.startsWith("/admin/")) return null
 
-  const { user } = useAuth()
-  const canUseChat = user && (user.userType === "pregnant" || user.isSpouse === true)
   const showCommunity = user?.userType === "pregnant"
   const navItems = baseNavItems
     .filter((i) => (i.href === "/chat" ? canUseChat : true))
@@ -34,6 +51,7 @@ export function BottomNav() {
         {navItems.map((item) => {
           const isActive = item.match(pathname)
           const Icon = item.icon
+          const showUnread = item.href === "/chat" && chatHasUnread
 
           return (
             <Link
@@ -48,7 +66,7 @@ export function BottomNav() {
             >
               <span
                 className={cn(
-                  "flex items-center justify-center transition-all duration-200",
+                  "relative flex items-center justify-center transition-all duration-200",
                   isActive && "scale-110"
                 )}
                 style={
@@ -63,6 +81,9 @@ export function BottomNav() {
                   className={cn("h-5 w-5", isActive && "stroke-[2.25]")}
                   strokeWidth={isActive ? 2.25 : 1.75}
                 />
+                {showUnread && (
+                  <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-[var(--critical)]" aria-label="未读" />
+                )}
               </span>
               <span className={cn(isActive && "font-semibold")}>{item.label}</span>
             </Link>

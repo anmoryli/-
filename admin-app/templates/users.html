@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}用户列表 - 孕期宝管理后台{% endblock %}
+{% block content %}
+<h1>用户列表</h1>
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>用户名</th>
+          <th>邮箱</th>
+          <th>类型</th>
+          <th>末次月经日</th>
+          <th>预产期</th>
+          <th>注册时间</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for u in users %}
+        <tr>
+          <td>{{ u.user_id }}</td>
+          <td>{{ u.username or '-' }}</td>
+          <td>{{ u.email or '-' }}</td>
+          <td><span class="badge">{{ u.user_type or 'pregnant' }}</span></td>
+          <td>{{ u.last_menstrual_date or '-' }}</td>
+          <td>{{ u.pregnancy_time or '-' }}</td>
+          <td class="muted">{{ u.created_at or '-' }}</td>
+          <td>
+            <a href="{{ url_for('records', user_id=u.user_id) }}" class="link">记录</a>
+            <a href="{{ url_for('conversations', user_id=u.user_id) }}" class="link">对话</a>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="8" class="muted">暂无用户</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

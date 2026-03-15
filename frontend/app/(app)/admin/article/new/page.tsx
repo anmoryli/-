@@ -52,7 +52,7 @@ export default function AdminArticleNewPage() {
       <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-[var(--card-border)] bg-[var(--background)] px-4 py-4">
         <button
           type="button"
-          onClick={() => router.push("/admin")}
+          onClick={() => router.back()}
           className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--muted)]"
         >
           <ArrowLeft className="h-5 w-5" />
@@ -140,7 +140,7 @@ export default function AdminArticleNewPage() {
           />
         </div>
         <div className="mt-6 flex gap-3">
-          <Button type="button" variant="outline" onClick={() => router.push("/admin")}>
+          <Button type="button" variant="outline" onClick={() => router.back()}>
             取消
           </Button>
           <Button type="submit" disabled={saving}>

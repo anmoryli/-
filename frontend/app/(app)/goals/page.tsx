@@ -47,7 +47,7 @@ export default function GoalsPage() {
     <div className="min-h-dvh bg-[var(--background)] pb-8">
       <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-[var(--card-border)] bg-[var(--background)]/95 px-4 py-4 backdrop-blur-sm">
         <button
-          onClick={() => router.push("/profile")}
+          onClick={() => router.back()}
           className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--muted)] transition-colors active:bg-[var(--muted)]/80"
         >
           <ArrowLeft className="h-5 w-5" strokeWidth={1.75} />

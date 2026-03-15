@@ -143,6 +143,33 @@ export async function changePassword(userId: number, oldPassword: string, newPas
   return apiPut<unknown>("/api/user/changePassword", { userId, oldPassword, newPassword })
 }
 
+/** 发送修改密码验证码：登录后传 userId；未登录传 email（找回密码） */
+export async function sendPasswordCode(params: { userId?: number; email?: string }) {
+  if (params.userId != null) {
+    return apiPost<unknown>("/api/user/sendPasswordCode", { userId: params.userId })
+  }
+  if (params.email) {
+    return apiPost<unknown>("/api/user/sendPasswordCode", { email: params.email })
+  }
+  throw new Error("请提供 userId 或 email")
+}
+
+/** 凭验证码修改密码：登录后传 userId；未登录传 email */
+export async function changePasswordByCode(params: {
+  userId?: number
+  email?: string
+  code: string
+  newPassword: string
+}) {
+  const body: Record<string, string | number> = {
+    code: params.code,
+    newPassword: params.newPassword,
+  }
+  if (params.userId != null) body.userId = params.userId
+  if (params.email) body.email = params.email
+  return apiPut<unknown>("/api/user/changePasswordByCode", body)
+}
+
 /** 上传头像（新用户无头像时使用） */
 export async function uploadAvatar(userId: number, file: File) {
   log("uploadAvatar", { userId, fileName: file.name })

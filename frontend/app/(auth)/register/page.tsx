@@ -4,6 +4,7 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Leaf, Eye, EyeOff } from "lucide-react"
+import { addMonths } from "date-fns"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -11,6 +12,22 @@ import { DateInput } from "@/components/date-input"
 import { register } from "@/lib/api/user"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
+
+/** 从怀孕日开始算 13 个月内的日期，用于预产期可选范围 */
+function dueDateMinMax(pregnancyStartYMD: string | null) {
+  const today = new Date()
+  const todayStr = today.toISOString().split("T")[0]
+  if (!pregnancyStartYMD || !/^\d{4}-\d{2}-\d{2}$/.test(pregnancyStartYMD)) {
+    const fallbackEnd = addMonths(today, 13)
+    return { min: todayStr, max: fallbackEnd.toISOString().split("T")[0] }
+  }
+  const start = new Date(pregnancyStartYMD + "T00:00:00")
+  const end = addMonths(start, 13)
+  return {
+    min: pregnancyStartYMD,
+    max: end.toISOString().split("T")[0],
+  }
+}
 
 export default function RegisterPage() {
   const router = useRouter()
@@ -210,25 +227,28 @@ export default function RegisterPage() {
           />
         </div>
 
-        {userType === "pregnant" && (
-          <>
-            <DateInput
-              id="lastMenstrualDate"
-              label="怀孕日（末次月经）"
-              value={lastMenstrualDate}
-              onChange={setLastMenstrualDate}
-              max={new Date().toISOString().split("T")[0]}
-            />
-            <DateInput
-              id="pregnancyTime"
-              label="预产期"
-              value={pregnancyTime}
-              onChange={setPregnancyTime}
-              min={new Date().toISOString().split("T")[0]}
-              max={new Date(Date.now() + 280 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]}
-            />
-          </>
-        )}
+        {userType === "pregnant" && (() => {
+          const { min: dueMin, max: dueMax } = dueDateMinMax(lastMenstrualDate || null)
+          return (
+            <>
+              <DateInput
+                id="lastMenstrualDate"
+                label="怀孕日（末次月经）"
+                value={lastMenstrualDate}
+                onChange={setLastMenstrualDate}
+                max={new Date().toISOString().split("T")[0]}
+              />
+              <DateInput
+                id="pregnancyTime"
+                label="预产期"
+                value={pregnancyTime}
+                onChange={setPregnancyTime}
+                min={dueMin}
+                max={dueMax}
+              />
+            </>
+          )
+        })()}
 
         <Button
           type="submit"

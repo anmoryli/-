@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}记录列表 - 孕期宝管理后台{% endblock %}
+{% block content %}
+<h1>记录列表</h1>
+<form class="filter-form card" method="get" action="{{ url_for('records') }}">
+  <label>用户 ID</label>
+  <input type="number" name="user_id" value="{{ user_id or '' }}" placeholder="留空全部" style="width:100px; padding:0.4rem; border-radius:var(--radius); border:1px solid var(--card-border);">
+  <label>类型</label>
+  <select name="type">
+    <option value="">全部</option>
+    <option value="text" {{ 'selected' if memo_type == 'text' else '' }}>文字</option>
+    <option value="voice" {{ 'selected' if memo_type == 'voice' else '' }}>语音</option>
+    <option value="photo" {{ 'selected' if memo_type == 'photo' else '' }}>照片</option>
+    <option value="file" {{ 'selected' if memo_type == 'file' else '' }}>文件</option>
+  </select>
+  <button type="submit" class="btn btn-secondary">筛选</button>
+</form>
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>记录 ID</th>
+          <th>用户</th>
+          <th>类型</th>
+          <th>摘要</th>
+          <th>创建时间</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in records %}
+        <tr>
+          <td>{{ r.memo_id }}</td>
+          <td>{{ r.username or r.user_id }} ({{ r.user_id }})</td>
+          <td><span class="badge">{{ r.type }}</span></td>
+          <td>{{ r.summary or r.photo_title or '-' }}</td>
+          <td class="muted">{{ r.created_at }}</td>
+          <td><a href="{{ url_for('record_detail', memo_id=r.memo_id) }}" class="link">详情</a></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="muted">暂无记录</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

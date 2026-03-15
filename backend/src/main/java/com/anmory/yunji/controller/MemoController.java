@@ -721,16 +721,19 @@ public class MemoController {
                 pdfExportService.exportToPdf(items, pdfUsername, baos);
                 byte[] pdfBytes = baos.toByteArray();
                 String pdfUrl = aliOssUtil.uploadExportPdf(userId, pdfBytes);
-                String htmlContent = com.anmory.yunji.service.impl.MailServiceImpl.wrapHtmlBody(
-                    "<p style=\"margin:0 0 16px;font-size:15px;\">您的孕期记录 PDF 已生成。</p>"
-                    + "<p style=\"margin:0 0 16px;font-size:15px;\"><a href=\"" + pdfUrl + "\" style=\"color:#c86b5a;text-decoration:underline;\">点击此处下载 PDF</a></p>"
-                    + "<p style=\"margin:0;font-size:13px;color:#787673;\">链接 7 天内有效，请及时保存。</p>"
-                );
-                mailService.sendHtmlMail(to, "您的孕期记录 PDF 已生成", htmlContent);
-                log.info("[导出] PDF 已上传 OSS 并发邮件链接 userId={} to={}", userId, to);
+                try {
+                    String textBody = "您的孕期记录 PDF 已生成。\n\n下载链接：\n" + pdfUrl + "\n\n链接 7 天内有效，请及时保存。";
+                    mailService.sendTextMail(to, "您的孕期记录 PDF 已生成", textBody);
+                    log.info("[导出] PDF 已上传 OSS 并发送邮件链接 userId={} to={} url={}", userId, to, pdfUrl);
+                } catch (Exception mailEx) {
+                    log.warn("[导出] 邮件发送失败，已通过站内通知下发链接 userId={} url={}", userId, pdfUrl, mailEx);
+                    userNotificationService.notifySystem(userId, "导出完成（邮件未发出）",
+                            "孕期记录 PDF 已生成，但邮件发送失败。请复制以下链接下载（7 天内有效）：\n\n" + pdfUrl);
+                }
             } catch (Exception e) {
-                log.warn("[导出] PDF 导出或发邮件失败 userId={}", userId, e);
+                log.warn("[导出] PDF 导出或发邮件失败 userId={}（请求导出的用户，通知发至其站内消息）", userId, e);
                 userNotificationService.notifySystem(userId, "导出失败", "孕期记录 PDF 导出失败，请稍后重试。");
+                log.info("[导出] 已为 userId={} 插入导出失败站内通知", userId);
             }
         });
         return ResponseEntity.status(org.springframework.http.HttpStatus.ACCEPTED).body(Result.success(null));

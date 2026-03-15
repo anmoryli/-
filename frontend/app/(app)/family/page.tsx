@@ -241,12 +241,12 @@ export default function FamilyPage() {
     <div className="min-h-dvh bg-[var(--background)] pb-8">
       <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-[var(--card-border)] bg-[var(--background)]/95 px-4 py-4 backdrop-blur-sm">
         <button
-          onClick={() => router.push("/profile")}
+          onClick={() => router.back()}
           className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--muted)] transition-colors active:bg-[var(--muted)]/80"
         >
           <ArrowLeft className="h-5 w-5" strokeWidth={1.75} />
         </button>
-        <h1 className="text-lg font-semibold text-[var(--foreground)]">家人共享</h1>
+        <h1 className="text-lg font-semibold text-[var(--foreground)]">我们的小家</h1>
       </div>
 
       <div className="space-y-6 px-4 pt-6">
@@ -305,7 +305,7 @@ export default function FamilyPage() {
                     onClick={handleGenerateTasks}
                     disabled={generatingTasks}
                   >
-                    {generatingTasks ? "生成中..." : "生成本周任务（推送给配偶）"}
+                    {generatingTasks ? "生成中..." : "为 TA 生成本周小任务"}
                   </Button>
                 </div>
               )}
@@ -414,7 +414,7 @@ export default function FamilyPage() {
                   if (editingMember?.userId === user?.userId) {
                     getById(user.userId).then((u) => {
                       setUser(u)
-                      toast.success("关系已更新，已刷新你的权限（配偶可使用记录助手）")
+                      toast.success("关系已更新，已刷新你的权限（配偶可使用孕期小伴）")
                     }).catch(() => { toast.success("关系已更新") })
                   } else {
                     toast.success("关系已更新")

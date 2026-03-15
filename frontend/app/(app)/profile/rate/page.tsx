@@ -6,26 +6,45 @@ import { ArrowLeft, Star } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { toast } from "sonner"
+import { useAuth } from "@/lib/auth-context"
+import { apiPost } from "@/lib/api"
 
 export default function RatePage() {
   const router = useRouter()
+  const { user } = useAuth()
 
   const [rating, setRating] = useState(0)
   const [hoverRating, setHoverRating] = useState(0)
   const [feedback, setFeedback] = useState("")
   const [submitted, setSubmitted] = useState(false)
+  const [sending, setSending] = useState(false)
 
   const ratingLabels = ["", "很差", "较差", "一般", "满意", "非常满意"]
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (rating === 0) {
       toast.error("请先选择评分")
       return
     }
 
-    // Simulate submission
-    setSubmitted(true)
-    toast.success("感谢您的评价！")
+    setSending(true)
+    try {
+      const content = [
+        `评分：${rating} 星（${ratingLabels[rating] || ""}）`,
+        feedback.trim() ? `\n还有什么想说的：\n${feedback.trim()}` : "",
+      ].join("")
+      await apiPost<void>("/api/feedback/send", {
+        subject: "孕期宝 - 评分反馈",
+        content: content || "（用户未填写）",
+        userId: user?.userId,
+      })
+      setSubmitted(true)
+      toast.success("感谢您的评价！")
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "提交失败，请稍后重试")
+    } finally {
+      setSending(false)
+    }
   }
 
   if (submitted) {
@@ -34,7 +53,7 @@ export default function RatePage() {
         {/* Header */}
         <div className="sticky top-0 z-10 flex items-center gap-3 bg-background/95 px-4 py-4 backdrop-blur-sm">
           <button
-            onClick={() => router.push("/profile")}
+            onClick={() => router.back()}
             className="flex h-9 w-9 items-center justify-center rounded-full bg-secondary transition-colors active:bg-secondary/80"
           >
             <ArrowLeft className="h-5 w-5" />
@@ -54,7 +73,7 @@ export default function RatePage() {
           </p>
           <Button
             variant="outline"
-            onClick={() => router.push("/profile")}
+            onClick={() => router.back()}
             className="mt-8"
           >
             返回
@@ -69,7 +88,7 @@ export default function RatePage() {
       {/* Header */}
       <div className="sticky top-0 z-10 flex items-center gap-3 bg-background/95 px-4 py-4 backdrop-blur-sm">
         <button
-          onClick={() => router.push("/profile")}
+          onClick={() => router.back()}
           className="flex h-9 w-9 items-center justify-center rounded-full bg-secondary transition-colors active:bg-secondary/80"
         >
           <ArrowLeft className="h-5 w-5" />
@@ -126,8 +145,8 @@ export default function RatePage() {
         </div>
 
         {/* Submit Button */}
-        <Button onClick={handleSubmit} className="mt-6 w-full" size="lg">
-          提交评价
+        <Button onClick={handleSubmit} className="mt-6 w-full" size="lg" disabled={sending}>
+          {sending ? "提交中…" : "提交评价"}
         </Button>
 
         {/* Note */}

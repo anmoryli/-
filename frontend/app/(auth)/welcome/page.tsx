@@ -25,21 +25,21 @@ const slides = [
   },
   {
     Illustration: MessageIllustration,
-    title: "记录助手",
+    title: "孕期小伴",
     slogan: null,
     desc: "孕妇与配偶均可使用。整理记录、写信给宝宝、回顾时光；提及配偶可代为发邮件通知。",
   },
   {
     Illustration: UsersIllustration,
-    title: "家人共享",
+    title: "我们的小家",
     slogan: null,
-    desc: "创建家庭、邀请码加入。关系可设为配偶/爸爸/妈妈等，一名孕妇仅一名配偶，配偶可用记录助手。",
+    desc: "创建家庭、邀请码加入。关系可设为配偶/爸爸/妈妈等，一名孕妇仅一名配偶，配偶可用孕期小伴。",
   },
   {
     Illustration: ListIllustration,
     title: "爸爸成长营",
     slogan: null,
-    desc: "孕妇可为配偶生成本周任务（陪同产检、情感任务），站内消息与邮件提醒，完成即打勾。",
+    desc: "孕妇可为配偶生成本周小任务（陪同产检、情感任务），站内消息与邮件提醒，完成即打勾。",
   },
   {
     Illustration: HeartPulseIllustration,
@@ -169,29 +169,29 @@ export default function WelcomePage() {
               })()}
             </div>
             <h1
-              className="text-center text-2xl font-semibold text-[var(--foreground)]"
+              className="text-center text-3xl font-semibold text-[var(--foreground)]"
               style={{ fontFamily: "var(--font-serif)" }}
             >
               {slides[step].title}
             </h1>
             {(slides[step] as { slogan?: string | null }).slogan && (
-              <p className="mt-2 text-center text-base font-medium text-[var(--accent-1)]">
+              <p className="mt-2 text-center text-lg font-medium text-[var(--accent-1)]">
                 {(slides[step] as { slogan: string }).slogan}
               </p>
             )}
-            <p className="mt-3 max-w-xs text-center text-[15px] leading-relaxed text-[var(--foreground-secondary)]">
+            <p className="mt-4 max-w-md text-center text-lg leading-relaxed text-[var(--foreground-secondary)]">
               {slides[step].desc}
             </p>
           </>
         ) : (
           <div className="w-full space-y-6 text-center">
             <h1
-              className="text-xl font-semibold text-[var(--foreground)]"
+              className="text-2xl font-semibold text-[var(--foreground)]"
               style={{ fontFamily: "var(--font-serif)" }}
             >
               开始使用
             </h1>
-            <p className="text-caption">登录或注册，记录你的孕期时光</p>
+            <p className="text-base text-[var(--foreground-secondary)]">登录或注册，记录你的孕期时光</p>
             <div className="mt-8 flex flex-col gap-3">
               <Link
                 href="/register"

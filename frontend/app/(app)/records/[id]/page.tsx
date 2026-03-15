@@ -8,7 +8,7 @@ import { format } from "date-fns"
 import { zhCN } from "date-fns/locale"
 import { ArrowLeft, Image, Mic, FileText, Download, Pencil, Users, Sparkles } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
-import { getAllEnriched, getFamilyEnriched, beautifyPreview, updateText, type MemoItem } from "@/lib/api/memo"
+import { getAllEnriched, getFamilyEnriched, getRecordById, beautifyPreview, updateText, type MemoItem } from "@/lib/api/memo"
 import { getMyFamily } from "@/lib/api/family"
 import { MarkdownView } from "@/components/markdown-view"
 import { PhotoCarousel } from "@/components/photo-carousel"
@@ -91,7 +91,10 @@ export default function RecordDetailPage() {
       } else {
         list = await getAllEnriched(user.userId, user.userId)
       }
-      const found = list.find((r) => String(r.id) === id)
+      let found = list.find((r) => String(r.id) === id)
+      if (!found) {
+        found = await getRecordById(Number(id), user.userId) ?? null
+      }
       setRecord(found ?? null)
     } catch {
       toast.error("获取记录失败")

@@ -429,7 +429,7 @@ export default function RecordsPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => !exportSubmitting && setShowExportModal(false)}>
           <div className="w-full max-w-sm rounded-xl border border-[var(--card-border)] bg-[var(--card)] p-4 shadow-lg" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-body font-semibold text-[var(--foreground)]">导出 PDF 至邮箱</h3>
-            <p className="mt-1 text-[13px] text-[var(--foreground-muted)]">完成后将发送至您的绑定邮箱，请稍候查收。</p>
+            <p className="mt-1 text-[13px] text-[var(--foreground-muted)]">完成后将发送至你的邮箱，请稍候查收。</p>
             <div className="mt-4 space-y-3">
               <p className="text-[13px] font-medium text-[var(--foreground)]">导出范围</p>
               <div className="flex gap-2">
@@ -478,7 +478,8 @@ export default function RecordsPage() {
                 onClick={async () => {
                   setExportSubmitting(true)
                   try {
-                    await exportPdfToEmail(creatorUserId ?? user!.userId, {
+                    // 始终用当前登录用户：收件邮箱与导出失败站内通知都发给操作人（如爸爸），不发给创建者（妈妈）
+                    await exportPdfToEmail(user!.userId, {
                       scope: exportScope,
                       fromDate: exportFromDate || undefined,
                       toDate: exportToDate || undefined,
@@ -614,7 +615,7 @@ export default function RecordsPage() {
                 href="/family"
                 className="mt-6 rounded-xl border border-[var(--accent-1)]/50 bg-[var(--accent-1-muted)] px-6 py-3 text-[14px] font-medium text-[var(--accent-1)]"
               >
-                前往家人共享
+                前往我们的小家
               </Link>
             ) : (
               canAddRecord && (

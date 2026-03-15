@@ -17,6 +17,10 @@ export interface Conversation {
   title?: string
   createTime?: string
   updateTime?: string
+  /** 是否有未读的 AI 消息（用于红点） */
+  hasUnreadAi?: boolean
+  /** 情景演绎时关联的情景 ID */
+  scenarioId?: number | null
 }
 
 export interface ChatMessage {
@@ -62,6 +66,19 @@ export async function deleteConversation(userId: number, conversationId: number)
   return null
 }
 
+/** 标记会话已读（清除未读 AI 红点） */
+export async function markConversationRead(userId: number, conversationId: number) {
+  if (USE_MOCK) return
+  await apiPost<unknown>("/api/ai/conversation/markRead", { userId, conversationId })
+}
+
+/** 是否有未读 AI 消息（供孕期小伴 Tab 红点） */
+export async function getConversationHasUnread(userId: number): Promise<boolean> {
+  if (USE_MOCK) return false
+  const data = await apiGet<boolean>("/api/ai/conversation/hasUnread", { userId })
+  return data === true
+}
+
 /** AI 对话（非流式，一次返回） */
 export async function chat(userId: number, conversationId: number, question: string) {
   if (USE_MOCK) {
@@ -75,7 +92,8 @@ export async function chat(userId: number, conversationId: number, question: str
 }
 
 /**
- * AI 流式对话：SSE 流式解析，UTF-8 解码，通过 onChunk 逐块回调，流结束时 resolve
+ * AI 流式对话：SSE 流式解析，UTF-8 解码，通过 onChunk 逐块回调，流结束时 resolve。
+ * 情景演绎时若后端发送 scenario_end_suggest 事件，会调用 onScenarioEndSuggest。
  */
 export function chatStream(
   userId: number,
@@ -83,7 +101,8 @@ export function chatStream(
   question: string,
   onChunk: (chunk: string) => void,
   images?: File[],
-  publishToCommunity?: boolean
+  publishToCommunity?: boolean,
+  onScenarioEndSuggest?: () => void
 ): Promise<void> {
   if (USE_MOCK) {
     const messages = mockSendMessage(conversationId, question)
@@ -147,6 +166,11 @@ export function chatStream(
         if (line.startsWith("data:")) {
           const data = line.slice(5).replace(/^\s+/, "")
           if (data === "[DONE]" || eventType === "done") return null
+          if (eventType === "scenario_end_suggest" && onScenarioEndSuggest) {
+            onScenarioEndSuggest()
+            eventType = ""
+            return null
+          }
           eventType = ""
           return data || null
         }
@@ -180,12 +204,21 @@ export function chatStream(
     })
 }
 
-/** 本周提示：调用 AI 生成一行 */
+/** 本周小贴士：调用 AI 生成一行（旧接口，作回退用） */
 export async function getWeeklyTip(userId: number, week?: number): Promise<string> {
   if (USE_MOCK) return "保持好心情，注意均衡饮食"
   const params: Record<string, string | number> = { userId }
   if (week != null && week > 0) params.week = week
   const data = await apiGet<string>("/api/ai/weeklyTip", params)
+  return typeof data === "string" ? data : "保持好心情，注意均衡饮食"
+}
+
+/** 本周提醒 AI：基于上周摘要生成 ≤20 字，主页「本周小贴士」优先使用 */
+export async function getWeeklyReminder(userId: number, week?: number): Promise<string> {
+  if (USE_MOCK) return "保持好心情，注意均衡饮食"
+  const params: Record<string, string | number> = { userId }
+  if (week != null && week > 0) params.week = week
+  const data = await apiGet<string>("/api/ai/weeklyReminder", params)
   return typeof data === "string" ? data : "保持好心情，注意均衡饮食"
 }
 
@@ -210,6 +243,24 @@ export async function getDailyWarm(userId: number): Promise<string> {
   if (USE_MOCK) return "今天也要好好照顾自己呀～"
   const data = await apiGet<string>("/api/ai/daily-warm", { userId })
   return typeof data === "string" ? data : "今天也要好好照顾自己呀～"
+}
+
+/** 创建情景演绎对话（仅配偶）：返回 conversationId, title, scenarioId, openingContent */
+export interface CreateScenarioConversationResult {
+  conversationId: number
+  title: string
+  scenarioId: number
+  openingContent: string
+}
+export async function createScenarioConversation(
+  userId: number,
+  scenarioId: number
+): Promise<CreateScenarioConversationResult> {
+  const data = await apiPost<CreateScenarioConversationResult>(
+    "/api/ai/createScenarioConversation",
+    { userId, scenarioId }
+  )
+  return data
 }
 
 /** 获取会话历史（后端返回 isAi，映射为 role） */

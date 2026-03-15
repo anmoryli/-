@@ -21,7 +21,19 @@ public class ConversationServiceImpl implements ConversationService {
         Conversation c = new Conversation();
         c.setUserId(userId);
         c.setMemoId(null);
+        c.setScenarioId(null);
         c.setTitle(title != null && !title.isBlank() ? title.trim() : "新对话");
+        conversationMapper.insert(c);
+        return c;
+    }
+
+    @Override
+    public Conversation createWithScenario(Integer userId, Integer scenarioId, String title) {
+        Conversation c = new Conversation();
+        c.setUserId(userId);
+        c.setMemoId(null);
+        c.setScenarioId(scenarioId);
+        c.setTitle(title != null && !title.isBlank() ? title.trim() : "情景演绎");
         conversationMapper.insert(c);
         return c;
     }

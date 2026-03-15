@@ -47,7 +47,7 @@ export default function ContactPage() {
     <div className="min-h-dvh bg-background">
       <div className="sticky top-0 z-10 flex items-center gap-3 bg-background/95 px-4 py-4 backdrop-blur-sm">
         <button
-          onClick={() => router.push("/profile")}
+          onClick={() => router.back()}
           className="flex h-9 w-9 items-center justify-center rounded-full bg-secondary transition-colors active:bg-secondary/80"
         >
           <ArrowLeft className="h-5 w-5" />

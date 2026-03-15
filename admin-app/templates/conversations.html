@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}AI 对话列表 - 孕期宝管理后台{% endblock %}
+{% block content %}
+<h1>AI 对话列表</h1>
+<form class="filter-form card" method="get" action="{{ url_for('conversations') }}">
+  <label>用户 ID</label>
+  <input type="number" name="user_id" value="{{ user_id or '' }}" placeholder="留空全部" style="width:100px; padding:0.4rem; border-radius:var(--radius); border:1px solid var(--card-border);">
+  <button type="submit" class="btn btn-secondary">筛选</button>
+</form>
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>会话 ID</th>
+          <th>用户</th>
+          <th>标题</th>
+          <th>创建时间</th>
+          <th>更新时间</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in conversations %}
+        <tr>
+          <td>{{ c.conversation_id }}</td>
+          <td>{{ c.username or c.user_id }} ({{ c.user_id }})</td>
+          <td>{{ c.title or '-' }}</td>
+          <td class="muted">{{ c.created_at }}</td>
+          <td class="muted">{{ c.updated_at }}</td>
+          <td><a href="{{ url_for('conversation_detail', conversation_id=c.conversation_id) }}" class="link">查看</a></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="muted">暂无会话</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

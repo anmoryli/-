@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}孕期宝 · 管理后台{% endblock %}</title>
+  <style>
+    /* 孕期宝设计变量（与主项目 globals.css 一致） */
+    :root {
+      --background: #FDFAF7;
+      --card: #FEFCFA;
+      --card-border: rgba(139, 135, 132, 0.12);
+      --foreground: #3D3B39;
+      --foreground-secondary: #8A8885;
+      --foreground-muted: #A8A5A1;
+      --accent-1: #E3B8B0;
+      --accent-1-muted: rgba(227, 184, 176, 0.25);
+      --accent-2: #F19C8C;
+      --accent-3: #B8CBB3;
+      --muted: #F0EDEA;
+      --radius: 0.5rem;
+      --radius-card: 0.75rem;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, sans-serif;
+      background: var(--background);
+      color: var(--foreground);
+      line-height: 1.5;
+      min-height: 100vh;
+    }
+    .container { max-width: 960px; margin: 0 auto; padding: 1rem 1.5rem; }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius-card);
+      padding: 1.25rem;
+      margin-bottom: 1rem;
+    }
+    .nav {
+      background: var(--card);
+      border-bottom: 1px solid var(--card-border);
+      padding: 0.75rem 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+    .nav a {
+      color: var(--foreground-secondary);
+      text-decoration: none;
+      margin-right: 1.25rem;
+    }
+    .nav a:hover { color: var(--accent-2); }
+    .nav a.active { color: var(--accent-1); font-weight: 600; }
+    h1 { font-size: 1.35rem; margin: 0 0 1rem 0; color: var(--foreground); }
+    .muted { color: var(--foreground-muted); font-size: 0.9rem; }
+    .table-wrap { overflow-x: auto; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+    th, td { padding: 0.6rem 0.75rem; text-align: left; border-bottom: 1px solid var(--card-border); }
+    th { background: var(--muted); color: var(--foreground-secondary); font-weight: 600; }
+    tr:hover { background: rgba(0,0,0,0.02); }
+    a.link { color: var(--accent-2); text-decoration: none; }
+    a.link:hover { text-decoration: underline; }
+    .btn {
+      display: inline-block;
+      padding: 0.5rem 1rem;
+      background: var(--accent-2);
+      color: var(--foreground);
+      border: none;
+      border-radius: var(--radius);
+      cursor: pointer;
+      font-size: 0.9rem;
+      text-decoration: none;
+    }
+    .btn:hover { opacity: 0.9; }
+    .btn-secondary { background: var(--accent-1); }
+    .badge {
+      display: inline-block;
+      padding: 0.2rem 0.5rem;
+      border-radius: var(--radius);
+      font-size: 0.8rem;
+      background: var(--accent-3);
+      color: var(--foreground);
+    }
+    .msg-user { background: var(--muted); }
+    .msg-ai { background: var(--accent-1-muted, rgba(227,184,176,0.25)); }
+    .msg-block { padding: 0.75rem 1rem; border-radius: var(--radius); margin-bottom: 0.5rem; }
+    .msg-block .time { font-size: 0.8rem; color: var(--foreground-muted); margin-bottom: 0.25rem; }
+    .content-html img { max-width: 100%; max-height: 280px; object-fit: contain; border-radius: var(--radius); }
+    .content-html { word-break: break-word; }
+    .photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 1rem; }
+    .photo-grid img { width: 100%; height: auto; border-radius: var(--radius); border: 1px solid var(--card-border); }
+    audio { max-width: 100%; margin-top: 0.5rem; }
+    .filter-form { display: flex; gap: 0.75rem; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; }
+    .filter-form label { color: var(--foreground-secondary); font-size: 0.9rem; }
+    .filter-form select { padding: 0.4rem 0.6rem; border-radius: var(--radius); border: 1px solid var(--card-border); }
+  </style>
+  {% block extra_css %}{% endblock %}
+</head>
+<body>
+  <nav class="nav">
+    <a href="{{ url_for('users') }}" class="{{ 'active' if request.endpoint == 'users' else '' }}">用户</a>
+    <a href="{{ url_for('records') }}" class="{{ 'active' if request.endpoint == 'records' else '' }}">记录</a>
+    <a href="{{ url_for('conversations') }}" class="{{ 'active' if request.endpoint == 'conversations' or request.endpoint == 'conversation_detail' else '' }}">AI 对话</a>
+  </nav>
+  <main class="container">
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

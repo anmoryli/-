@@ -61,6 +61,10 @@
   --radius: 0.5rem;
   --radius-card: 0.75rem;
   --radius-pill: 9999px;
+
+  /* 全屏渐变背景（与 --background 同色系低饱和） */
+  --gradient-b: #F5F0EC;
+  --gradient-c: #F0EDE8;
   --sidebar: var(--card);
   --sidebar-foreground: var(--foreground);
   --sidebar-primary: var(--accent-1);
@@ -77,6 +81,8 @@
   --background: #1C1B19;
   --background-alt: #252422;
   --card: #252422;
+  --gradient-b: #252422;
+  --gradient-c: #2A2826;
   --card-border: rgba(255, 255, 255, 0.06);
   --foreground: #EDEBE8;
   --foreground-secondary: #A8A5A1;

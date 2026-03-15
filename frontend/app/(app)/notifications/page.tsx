@@ -15,12 +15,25 @@ export default function NotificationsPage() {
   const [loading, setLoading] = useState(true)
   const [markingAll, setMarkingAll] = useState(false)
 
-  useEffect(() => {
+  const fetchList = () => {
     if (!user) return
     getNotificationList(user.userId)
       .then((data) => setList(data || []))
       .catch(() => setList([]))
       .finally(() => setLoading(false))
+  }
+
+  useEffect(() => {
+    if (!user) return
+    fetchList()
+  }, [user])
+
+  // 页面重新获得焦点时拉取最新列表（导出失败等异步通知插入后，切回本页即可看到）
+  useEffect(() => {
+    if (!user) return
+    const onFocus = () => fetchList()
+    window.addEventListener("focus", onFocus)
+    return () => window.removeEventListener("focus", onFocus)
   }, [user])
 
   if (!user) return null
@@ -40,7 +53,7 @@ export default function NotificationsPage() {
       <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-[var(--card-border)] bg-[var(--background)]/95 px-4 py-4 backdrop-blur-sm">
         <div className="flex items-center gap-3">
           <button
-            onClick={() => router.push("/profile")}
+            onClick={() => router.back()}
             className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--muted)] transition-colors active:bg-[var(--muted)]/80"
           >
             <ArrowLeft className="h-5 w-5" strokeWidth={1.75} />

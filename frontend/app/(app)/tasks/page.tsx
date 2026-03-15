@@ -93,7 +93,7 @@ export default function TasksPage() {
     <div className="min-h-dvh bg-[var(--background)] pb-8">
       <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-[var(--card-border)] bg-[var(--background)]/95 px-4 py-4 backdrop-blur-sm">
         <button
-          onClick={() => router.push("/profile")}
+          onClick={() => router.back()}
           className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--muted)] transition-colors active:bg-[var(--muted)]/80"
         >
           <ArrowLeft className="h-5 w-5" strokeWidth={1.75} />
@@ -103,7 +103,7 @@ export default function TasksPage() {
 
       <div className="space-y-6 px-4 pt-6">
         <p className="text-sm text-[var(--foreground-muted)]">
-          家庭任务与情感连接任务，完成即可打勾；孕妇可在「家人共享」中为配偶生成本周任务。
+          家庭任务与情感连接任务，完成即可打勾；孕妇可在「我们的小家」中为配偶生成本周小任务。
         </p>
         {isCreator && family && (
           <div className="flex flex-wrap gap-2">
@@ -156,7 +156,7 @@ export default function TasksPage() {
           </div>
         ) : pendingList.length === 0 && completedList.length === 0 ? (
           <div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card)] p-6 text-center text-sm text-[var(--foreground-muted)]">
-            {isCreator ? "暂无分配的任务。添加后将显示在这里。" : "暂无任务。孕妇可在「家人共享」中为配偶生成本周任务。"}
+            {isCreator ? "暂无分配的任务。添加后将显示在这里。" : "暂无任务。孕妇可在「我们的小家」中为配偶生成本周小任务。"}
           </div>
         ) : (
           <>
@@ -262,7 +262,7 @@ export default function TasksPage() {
                   value={customAssignee ?? ""}
                   onChange={(e) => setCustomAssignee(e.target.value ? Number(e.target.value) : null)}
                 >
-                  <option value="">{members.some((m) => m.isSpouse) ? "请选择配偶" : "暂无配偶，请先在家人共享中添加"}</option>
+                  <option value="">{members.some((m) => m.isSpouse) ? "请选择配偶" : "暂无配偶，请先在我们的小家中添加"}</option>
                   {members.filter((m) => m.isSpouse).map((m) => (
                     <option key={m.userId} value={m.userId}>{m.username}</option>
                   ))}
@@ -326,23 +326,30 @@ export default function TasksPage() {
               ) : (
                 <div className="space-y-2">
                   {suggestList.map((item, i) => (
-                    <label key={i} className="flex items-start gap-2 rounded-lg border border-[var(--card-border)] p-3 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={suggestSelected.has(i)}
-                        onChange={(e) => {
-                          setSuggestSelected((prev) => {
-                            const next = new Set(prev)
-                            if (e.target.checked) next.add(i)
-                            else next.delete(i)
-                            return next
-                          })
-                        }}
-                        className="mt-1"
-                      />
-                      <div>
-                        <p className="font-medium text-sm">{item.title}</p>
-                        {item.description && <p className="text-xs text-[var(--foreground-muted)] mt-0.5">{item.description}</p>}
+                    <label
+                      key={i}
+                      className="flex cursor-pointer items-start gap-3 rounded-2xl border border-[var(--card-border)] bg-[var(--card)] p-4 transition-colors hover:bg-[var(--muted)]/30"
+                    >
+                      <span className="mt-0.5 shrink-0">
+                        <input
+                          type="checkbox"
+                          checked={suggestSelected.has(i)}
+                          onChange={(e) => {
+                            setSuggestSelected((prev) => {
+                              const next = new Set(prev)
+                              if (e.target.checked) next.add(i)
+                              else next.delete(i)
+                              return next
+                            })
+                          }}
+                          className="h-5 w-5 rounded border-[var(--card-border)] text-[var(--accent-1)]"
+                        />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium text-[var(--foreground)]">{item.title}</p>
+                        {item.description && (
+                          <p className="mt-0.5 text-sm text-[var(--foreground-muted)]">{item.description}</p>
+                        )}
                       </div>
                     </label>
                   ))}

@@ -10,6 +10,7 @@ import com.anmory.yunji.entity.AiGenerationPostLike;
 import com.anmory.yunji.entity.AiGenerationPostComment;
 import com.anmory.yunji.entity.AiGenerationPostCommentLike;
 import com.anmory.yunji.entity.ScheduledOperation;
+import com.anmory.yunji.entity.Scenario;
 import com.anmory.yunji.entity.User;
 import com.anmory.yunji.mapper.AiGenerationPostMapper;
 import com.anmory.yunji.mapper.ScheduledOperationMapper;
@@ -22,6 +23,7 @@ import com.anmory.yunji.entity.Family;
 import com.anmory.yunji.service.ConversationService;
 import com.anmory.yunji.service.EmotionPregnancyService;
 import com.anmory.yunji.service.FamilyService;
+import com.anmory.yunji.service.ScenarioService;
 import com.anmory.yunji.service.MailService;
 import com.anmory.yunji.service.MemoService;
 import com.anmory.yunji.service.MessageService;
@@ -92,6 +94,7 @@ public class AiController {
     private final MailService mailService;
     private final ScheduledOperationMapper scheduledOperationMapper;
     private final ScheduleDraftStore scheduleDraftStore;
+    private final ScenarioService scenarioService;
 
     @Value("${spring.ai.openai.base-url}")
     private String aiBaseUrl;
@@ -141,6 +144,70 @@ public class AiController {
                                                    @RequestParam(required = false) String title) {
         Conversation conv = conversationService.create(userId, title != null ? title : "新对话");
         return Result.success(conv);
+    }
+
+    /** 创建情景演绎对话：仅配偶可调，创建带 scenarioId 的会话并生成 AI 开场白 */
+    @PostMapping("/createScenarioConversation")
+    public Result<Map<String, Object>> createScenarioConversation(@RequestParam Integer userId,
+                                                                  @RequestParam Integer scenarioId) {
+        if (!familyService.isSpouse(userId)) {
+            return Result.error(403, ErrorCode.FORBIDDEN.key(), "仅配偶可使用情景演绎");
+        }
+        com.anmory.yunji.entity.Family family = familyService.getMyFamily(userId);
+        if (family == null || family.getCreatorUserId() == null) {
+            return Result.error(400, "BAD_REQUEST", "请先加入我们的小家");
+        }
+        Scenario scenario = scenarioService.getById(scenarioId);
+        if (scenario == null) {
+            return Result.error(404, "NOT_FOUND", "情景不存在");
+        }
+        Conversation conv = conversationService.createWithScenario(userId, scenarioId, scenario.getTitle());
+        User creator = userService.getById(family.getCreatorUserId());
+        String week = creator != null && creator.getLastMenstrualDate() != null
+                ? PregnancyWeekUtil.calculatePregnancyWeek(creator.getLastMenstrualDate())
+                : "未知";
+        String dueDateStr = creator != null && creator.getPregnancyTime() != null
+                ? creator.getPregnancyTime().toLocalDate().toString()
+                : "未知";
+        String momName = creator != null && creator.getUsername() != null ? creator.getUsername() : "妻子";
+        String promptKey = scenario.getOpeningPromptKey() != null ? scenario.getOpeningPromptKey() : "scenario_opening";
+        String userPrompt = promptService.getUserPrompt(promptKey, "default",
+                Map.of("scenarioTitle", scenario.getTitle(), "momName", momName, "week", week, "dueDate", dueDateStr));
+        if (userPrompt == null || userPrompt.isBlank()) {
+            userPrompt = "请以孕妇（" + momName + "）的身份，为情景「" + scenario.getTitle() + "」写一段简短的开场白（1～3句），引导配偶进入对话。当前孕周：" + week + "，预产期：" + dueDateStr + "。直接输出开场白内容，不要引号、不要说明。";
+        }
+        try {
+            String systemPrompt = promptService.getSystemPrompt("scenario_opening", "default");
+            if (systemPrompt == null || systemPrompt.isBlank()) {
+                systemPrompt = "你是孕期宝情景演绎助手。根据情景与孕妇信息，生成一段自然、温暖的开场白，以孕妇口吻说出，引导配偶开始情景对话。";
+            }
+            String openingContent = ChatClient.builder(openAiChatModel)
+                    .defaultSystem(systemPrompt)
+                    .build()
+                    .prompt()
+                    .user(userPrompt)
+                    .call()
+                    .content();
+            if (openingContent == null || openingContent.isBlank()) openingContent = "（来聊聊吧～）";
+            messageService.save(conv.getConversationId(), userId, openingContent.trim(), true);
+            conversationService.setUnreadAi(conv.getConversationId());
+            Map<String, Object> out = new HashMap<>();
+            out.put("conversationId", conv.getConversationId());
+            out.put("title", conv.getTitle());
+            out.put("scenarioId", scenarioId);
+            out.put("openingContent", openingContent.trim());
+            return Result.success(out);
+        } catch (Exception e) {
+            log.warn("[情景演绎] 开场白生成失败 conversationId={}", conv.getConversationId(), e);
+            messageService.save(conv.getConversationId(), userId, "来聊聊吧～", true);
+            conversationService.setUnreadAi(conv.getConversationId());
+            Map<String, Object> out = new HashMap<>();
+            out.put("conversationId", conv.getConversationId());
+            out.put("title", conv.getTitle());
+            out.put("scenarioId", scenarioId);
+            out.put("openingContent", "来聊聊吧～");
+            return Result.success(out);
+        }
     }
 
     @GetMapping("/conversation/list")
@@ -283,11 +350,12 @@ public class AiController {
         messageService.save(conversationId, userId, userMessageForHistory, false);
 
         SseEmitter emitter = new SseEmitter(60_000L);
-        ChatIntent intent = detectIntent(safeQuestion, hasImages);
-        log.info("[多模态] 意图识别 userId={} conversationId={} intent={}", userId, conversationId, intent);
+        boolean isScenario = conv.getScenarioId() != null;
+        ChatIntent intent = isScenario ? ChatIntent.TEXT_CHAT : detectIntent(safeQuestion, hasImages);
+        log.info("[多模态] 意图识别 userId={} conversationId={} intent={} isScenario={}", userId, conversationId, intent, isScenario);
 
         try {
-            if (!hasImages && intent == ChatIntent.TEXT_TO_IMAGE) {
+            if (!isScenario && !hasImages && intent == ChatIntent.TEXT_TO_IMAGE) {
                 String imageUrl = generateImageFromText(userId, safeQuestion);
                 String answer = "这是我为你生成的图片：\n\n![AI生成图片](" + imageUrl + ")";
                 messageService.save(conversationId, userId, answer, true);
@@ -298,7 +366,7 @@ public class AiController {
                 return emitter;
             }
 
-            if (hasImages && intent == ChatIntent.IMAGE_TO_IMAGE) {
+            if (!isScenario && hasImages && intent == ChatIntent.IMAGE_TO_IMAGE) {
                 String imageUrl = generateImageFromImage(userId, safeQuestion, imageUrls.get(0));
                 String answer = "这是我基于你上传图片生成的变体：\n\n![AI生成图片](" + imageUrl + ")";
                 boolean insertPost = publishToCommunity;
@@ -338,7 +406,7 @@ public class AiController {
             return emitter;
         }
 
-        if (!hasImages && intent == ChatIntent.REMINDER) {
+        if (!isScenario && !hasImages && intent == ChatIntent.REMINDER) {
             try {
                 String stateJson = scheduleDraftStore.get(conversationId);
                 String time = "", place = "", what = "", notes = "";
@@ -529,7 +597,7 @@ public class AiController {
         }
 
         String questionForStream = safeQuestion;
-        if (hasImages) {
+        if (!isScenario && hasImages) {
             try {
                 String imageUnderstanding = analyzeImage(imageUrls.get(0), safeQuestion);
                 questionForStream = buildImageUnderstandingPrompt(safeQuestion, imageUnderstanding);
@@ -538,8 +606,7 @@ public class AiController {
             }
         }
 
-        // 主路径会做 RAG 检索，视为“从向量库找东西”，不把用户问题写入向量库
-        messageService.save(conversationId, userId, safeQuestion, false, false);
+        // 用户消息已在前面 messageService.save(conversationId, userId, userMessageForHistory, false) 保存，此处不再重复保存
 
         StringBuilder fullAnswer = new StringBuilder();
         AtomicInteger chunkCount = new AtomicInteger(0);
@@ -568,11 +635,36 @@ public class AiController {
                 baseSystem = baseSystem + "\n\n" + letterGuide;
             }
         }
+        // 情景演绎：AI 扮演孕妇（妻子）回复配偶
+        if (conv.getScenarioId() != null) {
+            Scenario scenario = scenarioService.getById(conv.getScenarioId());
+            com.anmory.yunji.entity.Family fam = familyService.getMyFamily(userId);
+            Integer creatorId = fam != null ? fam.getCreatorUserId() : null;
+            User creator = creatorId != null ? userService.getById(creatorId) : null;
+            String week = creator != null && creator.getLastMenstrualDate() != null
+                    ? PregnancyWeekUtil.calculatePregnancyWeek(creator.getLastMenstrualDate())
+                    : "未知";
+            String momName = creator != null && creator.getUsername() != null ? creator.getUsername() : "妻子";
+            String scenarioTitle = scenario != null ? scenario.getTitle() : "情景";
+            String roleplayPrompt = promptService.getSystemPrompt("scenario_roleplay", "default");
+            if (roleplayPrompt == null || roleplayPrompt.isBlank()) {
+                roleplayPrompt = "你是孕期宝情景演绎中的孕妇（妻子）角色。当前情景：「" + scenarioTitle + "」。你的身份：孕周 " + week + " 的准妈妈。请以妻子口吻自然、温暖地回复配偶的对话，符合该情景与孕期身份，不要暴露你是 AI，不要跳出角色。回复简洁自然，可输出 markdown。";
+            } else {
+                roleplayPrompt = roleplayPrompt
+                        .replace("{{scenarioTitle}}", scenarioTitle)
+                        .replace("{{week}}", week)
+                        .replace("{{momName}}", momName);
+            }
+            baseSystem = roleplayPrompt;
+            userContext = ""; // 情景模式不再追加普通用户上下文，避免混淆
+        }
         String systemPrompt = baseSystem + (userContext.isEmpty() ? "" : "\n\n当前用户情况：" + userContext);
         final List<String> imageUrlsFromRag = new ArrayList<>();
-        log.info("[RAG] 开始检索 userId={} conversationId={} questionLen={}", userId, conversationId, questionForStream != null ? questionForStream.length() : 0);
+        if (conv.getScenarioId() == null) {
+            log.info("[RAG] 开始检索 userId={} conversationId={} questionLen={}", userId, conversationId, questionForStream != null ? questionForStream.length() : 0);
+        }
         try {
-            String ragContext = ragService.getRelevant(questionForStream, userId, true);
+            String ragContext = (conv.getScenarioId() != null) ? null : ragService.getRelevant(questionForStream, userId, true);
             log.info("[RAG] 检索完成 userId={} conversationId={} questionPreview={} 结果长度={}", userId, conversationId, questionForStream != null && questionForStream.length() > 50 ? questionForStream.substring(0, 50) + "…" : questionForStream, ragContext != null ? ragContext.length() : 0);
             log.info("[RAG] 检索结果内容：\n{}", ragContext != null ? ragContext : "（空）");
             if (ragContext != null && !ragContext.isBlank() && !ragContext.contains("暂未找到") && !ragContext.contains("不可用") && !ragContext.contains("异常")) {
@@ -725,6 +817,12 @@ public class AiController {
                         }
                         if (!appendText.isEmpty()) {
                             emitter.send(SseEmitter.event().data(appendText));
+                        }
+                        // 情景演绎：若 AI 回复带有「自然结束」语义，建议前端弹出结束确认
+                        if (conv.getScenarioId() != null && suggestScenarioEnd(fullAnswer.toString())) {
+                            try {
+                                emitter.send(SseEmitter.event().name("scenario_end_suggest").data("1"));
+                            } catch (IOException ignored) {}
                         }
                         emitter.send(SseEmitter.event().name("done").data(""));
                         emitter.complete();
@@ -900,6 +998,17 @@ public class AiController {
         if (lower.matches(".*(之前的|以前的|那天|那天拍的|记录里的).*(图|照片|图片).*")) return true;
         if (lower.matches(".*(图呢|照片呢|图片呢|有图吗|有照片吗).*")) return true;
         return false;
+    }
+
+    /** 情景演绎：根据 AI 回复内容判断是否带有「自然结束」语义，用于建议用户结束情景并生成报告 */
+    private boolean suggestScenarioEnd(String aiReply) {
+        if (aiReply == null || aiReply.isBlank()) return false;
+        String tail = aiReply.length() > 200 ? aiReply.substring(aiReply.length() - 200) : aiReply;
+        String normalized = tail.replaceAll("\\s+", " ");
+        return normalized.contains("先这样") || normalized.contains("那就这样") || normalized.contains("晚安")
+                || normalized.contains("早点休息") || normalized.contains("下次再聊") || normalized.contains("先聊到这")
+                || normalized.contains("改天再聊") || normalized.contains("拜拜") || normalized.contains("再见")
+                || normalized.contains("先这样吧") || normalized.contains("好了，就这样") || normalized.contains("好的，就这样");
     }
 
     private String buildConversationMemory(Integer conversationId) {

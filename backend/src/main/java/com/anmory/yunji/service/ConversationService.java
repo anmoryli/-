@@ -8,6 +8,9 @@ public interface ConversationService {
 
     Conversation create(Integer userId, String title);
 
+    /** 创建情景演绎会话（带 scenarioId） */
+    Conversation createWithScenario(Integer userId, Integer scenarioId, String title);
+
     List<Conversation> listByUserId(Integer userId);
 
     Conversation getById(Integer conversationId);

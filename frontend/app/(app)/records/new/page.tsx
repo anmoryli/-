@@ -15,6 +15,7 @@ import { getPregnancyInfo } from "@/lib/pregnancy"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import { useBack } from "@/lib/use-back"
+import { triggerMotionFast } from "@/app/(app)/layout"
 
 type MemoType = "text" | "photo" | "voice" | "file"
 
@@ -214,10 +215,12 @@ export default function NewRecordPage() {
     const file = e.target.files?.[0]
     if (file) {
       if (file.size > 500 * 1024 * 1024) {
-        toast.error("文件大小不能超过500MB")
+        toast.error("文件大小不能超过 500MB")
         return
       }
       setSelectedFile(file)
+      const isVideo = file.type.startsWith("video/")
+      toast.success(isVideo ? "已选择视频，可保存记录" : "已选择文件")
     }
   }
 
@@ -320,6 +323,7 @@ export default function NewRecordPage() {
       setShowSuccessAnim(true)
       setTimeout(() => {
         toast.success("记录已保存")
+        triggerMotionFast()
         router.push("/records")
       }, 600)
     } catch (err) {
@@ -780,7 +784,11 @@ export default function NewRecordPage() {
                 <p className="truncate text-[15px] font-medium text-[var(--foreground)]">
                   {selectedFile.name}
                 </p>
-                <p className="text-caption">{(selectedFile.size / 1024).toFixed(1)} KB</p>
+                <p className="text-caption">
+                  {selectedFile.size >= 1024 * 1024
+                    ? `${(selectedFile.size / 1024 / 1024).toFixed(2)} MB`
+                    : `${(selectedFile.size / 1024).toFixed(1)} KB`}
+                </p>
               </div>
               <button
                 type="button"
@@ -797,13 +805,14 @@ export default function NewRecordPage() {
               className="flex w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-[var(--card-border)] bg-[var(--muted)]/50 py-8 transition-colors active:bg-[var(--muted)]"
             >
               <Upload className="h-8 w-8 text-[var(--foreground-muted)]" strokeWidth={1.75} />
-              <span className="text-caption">点击上传文件（最大500MB）</span>
+              <span className="text-caption">支持文档、视频等（最大 500MB）</span>
             </button>
           )}
           <input
             ref={fileInputRef}
             type="file"
             className="hidden"
+            accept="video/*,.mp4,.webm,.mov,.m4v,application/pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,image/*"
             onChange={handleFileSelect}
           />
         </div>

@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils"
 
 const familyActions = [
   {
-    label: "家人共享",
+    label: "我们的小家",
     icon: Users,
     href: "/family",
     className: "border-[var(--accent-1)]/40 bg-[var(--accent-1-muted)] text-[var(--accent-1)]",

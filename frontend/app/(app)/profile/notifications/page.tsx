@@ -43,7 +43,7 @@ export default function NotificationsPage() {
       {/* Header */}
       <div className="sticky top-0 z-10 flex items-center gap-3 bg-background/95 px-4 py-4 backdrop-blur-sm">
         <button
-          onClick={() => router.push("/profile")}
+          onClick={() => router.back()}
           className="flex h-9 w-9 items-center justify-center rounded-full bg-secondary transition-colors active:bg-secondary/80"
         >
           <ArrowLeft className="h-5 w-5" />
@@ -76,9 +76,9 @@ export default function NotificationsPage() {
               <MessageSquare className="h-5 w-5" />
             </div>
             <div className="flex-1">
-              <p className="text-sm font-medium text-foreground">记录助手回复通知</p>
+              <p className="text-sm font-medium text-foreground">孕期小伴回复通知</p>
               <p className="mt-0.5 text-xs text-muted-foreground">
-                记录助手回复完成时在页面内提示
+                孕期小伴回复完成时在页面内提示
               </p>
             </div>
             <Switch

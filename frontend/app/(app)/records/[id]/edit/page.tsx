@@ -321,10 +321,11 @@ export default function EditRecordPage() {
       {record.type === "file" && (
         <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-[var(--card-border)] bg-[var(--card)] px-4 py-3 text-sm">
           <Upload className="h-4 w-4" />
-          上传新文件
+          上传新文件（支持文档、视频等，最大 500MB）
           <input
             type="file"
             className="hidden"
+            accept="video/*,.mp4,.webm,.mov,.m4v,application/pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,image/*"
             onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
           />
         </label>

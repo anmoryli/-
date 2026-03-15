@@ -36,10 +36,16 @@ public class AliOssUtil {
     }
 
     /**
-     * 生成普通文件ObjectKey
+     * 生成普通文件ObjectKey（支持文档、视频等，无扩展名时用 .file）
      */
     private String generateFileObjectKey(Integer userId, String originalFilename) {
-        String suffix = originalFilename.substring(originalFilename.lastIndexOf("."));
+        String suffix = ".file";
+        if (originalFilename != null && !originalFilename.isBlank()) {
+            int lastDot = originalFilename.lastIndexOf(".");
+            if (lastDot >= 0 && lastDot < originalFilename.length() - 1) {
+                suffix = originalFilename.substring(lastDot);
+            }
+        }
         String uniqueFileName = UUID.randomUUID().toString() + suffix;
         return "yunji/" + userId + "/file/" + uniqueFileName;
     }

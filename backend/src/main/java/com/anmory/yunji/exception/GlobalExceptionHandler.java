@@ -45,6 +45,14 @@ public class GlobalExceptionHandler {
         return Result.error(ErrorCode.VALIDATION_ERROR.code(), ErrorCode.VALIDATION_ERROR.key(), msg);
     }
 
+    @ExceptionHandler(Throwable.class)
+    public Object handleThrowable(Throwable ex, HttpServletRequest request, HttpServletResponse response) {
+        // 任何未捕获的异常/错误都打完整堆栈，便于排查 500 无日志
+        log.error("[GlobalException] >>> 未捕获异常 Throwable uri={} method={} msg={}", request != null ? request.getRequestURI() : "", request != null ? request.getMethod() : "", ex.getMessage(), ex);
+        if (response.isCommitted()) return null;
+        return Result.error(ErrorCode.INTERNAL_ERROR.code(), ErrorCode.INTERNAL_ERROR.key(), "系统繁忙，请稍后重试");
+    }
+
     @ExceptionHandler(Exception.class)
     public Object handleException(Exception ex, HttpServletRequest request, HttpServletResponse response) {
         if (isClientAbort(ex)) {
@@ -52,7 +60,7 @@ public class GlobalExceptionHandler {
             return null;
         }
         if (response.isCommitted()) {
-            log.warn("Response already committed, cannot write error body: {}", ex.getMessage());
+            log.error("[GlobalException] >>> Response 已提交，无法写错误体 msg={}", ex.getMessage(), ex);
             return null;
         }
         String uri = request != null ? request.getRequestURI() : "";
@@ -68,7 +76,7 @@ public class GlobalExceptionHandler {
                 log.warn("Failed to write PDF error response", e);
             }
         }
-        log.error("Unhandled server exception", ex);
+        log.error("[GlobalException] >>> 未捕获异常 Exception uri={} msg={}", request != null ? request.getRequestURI() : "", ex.getMessage(), ex);
         return Result.error(ErrorCode.INTERNAL_ERROR.code(), ErrorCode.INTERNAL_ERROR.key(), "系统繁忙，请稍后重试");
     }
 

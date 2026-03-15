@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}记录详情 #{{ memo.memo_id }} - 孕期宝管理后台{% endblock %}
+{% block content %}
+<h1>记录详情 #{{ memo.memo_id }}</h1>
+<div class="card">
+  <p><strong>用户</strong> {{ memo.username or memo.user_id }} (ID: {{ memo.user_id }})</p>
+  <p><strong>类型</strong> <span class="badge">{{ memo_type }}</span></p>
+  <p><strong>创建时间</strong> <span class="muted">{{ memo.created_at }}</span></p>
+  {% if memo.photo_title or memo.photo_description %}
+  <p><strong>标题</strong> {{ memo.photo_title or '-' }}</p>
+  <p><strong>描述</strong> {{ memo.photo_description or '-' }}</p>
+  {% endif %}
+</div>
+
+{% if memo_type == 'text' and detail %}
+<div class="card">
+  <h2 style="font-size:1.1rem; margin-bottom:0.5rem;">{{ detail.title or '无标题' }}</h2>
+  <div class="muted" style="margin-bottom:0.75rem;">{{ detail.created_at }}</div>
+  <div style="white-space: pre-wrap; word-break: break-word;">{{ detail.content or '' }}</div>
+</div>
+{% endif %}
+
+{% if memo_type == 'voice' and detail %}
+<div class="card">
+  <h2 style="font-size:1.1rem;">{{ detail.title or '语音' }}</h2>
+  <p class="muted">{{ detail.created_at }}</p>
+  {% if detail.url %}
+  <audio src="{{ detail.url }}" controls></audio>
+  {% endif %}
+  {% if detail.text_content %}
+  <p style="margin-top:1rem;"><strong>转写</strong></p>
+  <div style="white-space: pre-wrap; word-break: break-word;">{{ detail.text_content }}</div>
+  {% endif %}
+</div>
+{% endif %}
+
+{% if memo_type == 'photo' and detail and detail.photos %}
+<div class="card">
+  <h2 style="font-size:1.1rem; margin-bottom:0.75rem;">照片 ({{ detail.photos|length }} 张)</h2>
+  <div class="photo-grid">
+    {% for p in detail.photos %}
+    <div>
+      {% if p.url %}
+      <a href="{{ p.url }}" target="_blank" rel="noopener"><img src="{{ p.url }}" alt="照片 {{ p.photo_id }}"></a>
+      {% else %}
+      <span class="muted">无 URL</span>
+      {% endif %}
+      <p class="muted" style="font-size:0.8rem; margin-top:0.25rem;">{{ p.created_at }}</p>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{% if memo_type == 'file' and detail %}
+<div class="card">
+  <h2 style="font-size:1.1rem;">{{ detail.title or '文件' }}</h2>
+  <p class="muted">{{ detail.created_at }}</p>
+  {% if detail.url %}
+  <p><a href="{{ detail.url }}" class="link" target="_blank" rel="noopener">打开 / 下载文件</a></p>
+  {% set ext = detail.url.split('?')[0].split('.')[-1]|lower %}
+  {% if ext in ['jpg', 'jpeg', 'png', 'gif', 'webp'] %}
+  <p style="margin-top:0.75rem;"><strong>预览</strong></p>
+  <img src="{{ detail.url }}" alt="文件预览" style="max-width:100%; max-height:400px; object-fit: contain; border-radius: var(--radius); border: 1px solid var(--card-border);">
+  {% endif %}
+  {% else %}
+  <p class="muted">无 URL</p>
+  {% endif %}
+</div>
+{% endif %}
+
+<p style="margin-top:1rem;"><a href="{{ url_for('records', user_id=memo.user_id) }}" class="btn btn-secondary">返回记录列表</a></p>
+{% endblock %}

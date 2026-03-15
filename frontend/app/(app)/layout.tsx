@@ -5,6 +5,10 @@ import { useRouter } from "next/navigation"
 import { BottomNav } from "@/components/bottom-nav"
 import { AuthProvider, useAuth } from "@/lib/auth-context"
 
+export function triggerMotionFast() {
+  // no-op after removing gradient animation
+}
+
 function AuthGuard({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth()
   const router = useRouter()
@@ -27,7 +31,12 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
 
   if (!user) return null
 
-  return <>{children}</>
+  return (
+    <div className="mx-auto min-h-screen max-w-lg bg-[var(--background)]">
+      <main className="pb-20">{children}</main>
+      <BottomNav />
+    </div>
+  )
 }
 
 export default function AppLayout({
@@ -37,12 +46,7 @@ export default function AppLayout({
 }) {
   return (
     <AuthProvider>
-      <AuthGuard>
-        <div className="mx-auto min-h-screen max-w-lg bg-[var(--background)]">
-          <main className="pb-20">{children}</main>
-          <BottomNav />
-        </div>
-      </AuthGuard>
+      <AuthGuard>{children}</AuthGuard>
     </AuthProvider>
   )
 }

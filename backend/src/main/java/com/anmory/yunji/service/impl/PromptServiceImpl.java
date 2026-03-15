@@ -15,6 +15,12 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * 提示词来源（说清楚）：
+ * 1. 先查数据库 prompt_template 表（按 key + model_type），有则用数据库的。
+ * 2. 没有则用 resources/prompts/pregnancy.json 里同 key 的 system_prompt、user_prompt_template。
+ * DB 与 JSON 条数可以不一致，以 DB 优先；未跑过的 migration 或新 key 只存在于 JSON 时，会用 JSON。
+ */
 @Slf4j
 @Service
 public class PromptServiceImpl implements PromptService {

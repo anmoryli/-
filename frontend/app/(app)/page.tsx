@@ -7,6 +7,7 @@ import { QuickActions } from "@/components/home/quick-actions"
 import { RecentRecords } from "@/components/home/recent-records"
 import { RecordStats } from "@/components/home/record-stats"
 import { TrendChart } from "@/components/home/trend-chart"
+import { EmotionPregnancyChart } from "@/components/home/emotion-pregnancy-chart"
 import { WeightChart } from "@/components/home/weight-chart"
 import { MoodChart } from "@/components/home/mood-chart"
 import { KickCounter } from "@/components/home/kick-counter"
@@ -16,6 +17,7 @@ import { ContractionTimer } from "@/components/home/contraction-timer"
 import { ShareCard } from "@/components/home/share-card"
 import { GoalWidget } from "@/components/home/goal-widget"
 import { TimeCapsule } from "@/components/home/time-capsule"
+import { SpouseEmotionCard } from "@/components/home/spouse-emotion-card"
 import { useAuth } from "@/lib/auth-context"
 import { getAllEnriched, getFamilyEnriched, type MemoItem } from "@/lib/api/memo"
 import { getPregnancyInfo, getWeeklyTip, getDailyWarmth } from "@/lib/pregnancy"
@@ -62,7 +64,7 @@ export default function HomePage() {
         message = getDailyWarmth()
       } else if (user.pregnancyTime) {
         const info = getPregnancyInfo(user.lastMenstrualDate ?? user.pregnancyTime, user.pregnancyTime)
-        message = `本周提示：${getWeeklyTip(info.weeksPregnant)}`
+        message = `本周小贴士：${getWeeklyTip(info.weeksPregnant)}`
       } else {
         message = getDailyWarmth()
       }
@@ -116,6 +118,13 @@ export default function HomePage() {
         </p>
       </div>
 
+      {/* 爸爸端：妻子情绪趋势概览 — 仅家庭成员（配偶）可见 */}
+      {!isPregnant && (
+        <section>
+          <SpouseEmotionCard userId={user.userId} />
+        </section>
+      )}
+
       {/* Pregnancy Status Card — 仅孕妇本人 */}
       {isPregnant && user.pregnancyTime && (
         <PregnancyCard
@@ -139,11 +148,12 @@ export default function HomePage() {
         </section>
       )}
 
-      {/* 记录回顾、本周小结、时光轴、胎动心情趋势与数据可视化 — 仅孕妇本人 */}
+      {/* 记录回顾、本周小结、情绪-孕周、胎动心情趋势与数据可视化 — 仅孕妇本人 */}
       {isPregnant && (
         <section className="space-y-4">
           {records.length > 0 && <RecordStats records={records} />}
           <TrendChart userId={user.userId} />
+          <EmotionPregnancyChart userId={user.userId} />
           <WeightChart userId={user.userId} days={30} />
           <MoodChart userId={user.userId} days={7} />
         </section>
@@ -194,7 +204,7 @@ export default function HomePage() {
         <QuickActions isPregnant={isPregnant} />
       </section>
 
-      {/* Recent Records — 家庭成员无自己的记录，可前往家人共享 */}
+      {/* Recent Records — 家庭成员无自己的记录，可前往我们的小家 */}
       <section>
         <h2 className="mb-4 text-[13px] font-semibold uppercase tracking-wider text-[var(--foreground-muted)]">
           最近记录

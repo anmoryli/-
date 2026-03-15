@@ -54,10 +54,7 @@ export default function FamilyJoinPage() {
     setCustomRelationship(r)
   }, [user])
 
-  const handleBack = () => {
-    if (hasFamily) router.push("/family")
-    else router.push("/profile")
-  }
+  const handleBack = () => router.back()
 
   const handleJoin = async () => {
     if (!user || !inviteCode.trim()) {
@@ -111,7 +108,7 @@ export default function FamilyJoinPage() {
             className="mt-3 flex items-center justify-center gap-2 rounded-lg bg-[var(--accent-1)] px-4 py-2 text-sm font-medium text-white"
           >
             <Users className="h-4 w-4" strokeWidth={1.75} />
-            前往家人共享
+            前往我们的小家
           </Link>
         </div>
       )}

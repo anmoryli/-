@@ -87,6 +87,9 @@ export interface CreatorPregnancyInfo {
   lastMenstrualDate: string | null
   pregnancyTime: string | null
   recordCount: number
+  recordCountTotal?: number
+  recordCountMom?: number
+  recordCountDad?: number
 }
 
 export async function getCreatorPregnancy(userId: number): Promise<CreatorPregnancyInfo | null> {
