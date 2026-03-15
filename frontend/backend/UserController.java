@@ -31,10 +31,15 @@ public class UserController {
                                  @RequestParam("password") String password,
                                  @RequestParam(value = "email", required = false) String email,
                                  @RequestParam("pregnancyTime")LocalDateTime pregnancyTime) {
-
-        userService.register(username,password,email,pregnancyTime);
-
-        return Result.success();
+        try {
+            User user = userService.register(username, password, email, "pregnant", null, pregnancyTime, null);
+            return Result.success(user);
+        } catch (BusinessException e) {
+            return Result.error(400, e.getMessage(), e.getMessage());
+        } catch (Exception e) {
+            log.error("注册失败", e);
+            return Result.error(500, "注册失败", "系统错误，请稍后重试");
+        }
     }
 
     // 登录

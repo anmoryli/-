@@ -65,7 +65,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -684,12 +686,33 @@ public class AiController {
                 .defaultSystem(systemPrompt)
                 .build();
 
+        AtomicBoolean hasError = new AtomicBoolean(false);
+        AtomicReference<Throwable> lastError = new AtomicReference<>();
+
         client.prompt()
                 .user(userPrompt)
                 .stream()
                 .content()
                 .subscribeOn(Schedulers.boundedElastic())
                 .doOnSubscribe(s -> log.info("[流式] 已订阅 AI 流 userId={} conversationId={}", userId, conversationId))
+                .doOnError(error -> {
+                    hasError.set(true);
+                    lastError.set(error);
+                    log.error("[流式] AI 流出现错误 userId={} conversationId={} error={}", userId, conversationId, error.getMessage(), error);
+
+                    // 如果是EOFException或网络相关错误，尝试发送错误信息给前端
+                    if (error instanceof java.io.EOFException ||
+                        error.getMessage() != null && error.getMessage().contains("EOF")) {
+                        try {
+                            String errorMsg = "AI服务暂时不稳定，请稍后重试。";
+                            emitter.send(SseEmitter.event().data(errorMsg));
+                            fullAnswer.append(errorMsg);
+                            log.warn("[流式] EOF错误，已发送错误提示给前端 userId={} conversationId={}", userId, conversationId);
+                        } catch (IOException e) {
+                            log.warn("[流式] 发送错误提示失败 userId={} conversationId={}", userId, conversationId, e);
+                        }
+                    }
+                })
                 .doOnNext(chunk -> {
                     if (chunk != null && !chunk.isEmpty()) {
                         try {
@@ -719,10 +742,29 @@ public class AiController {
                     // 无论流式成功还是异常结束，都执行：保存 AI 回复 + 配偶提及检测与邮件 + 追加提示并下发给前端
                     try {
                         String full = fullAnswer.toString();
+
+                        // 处理流式错误情况
+                        if (hasError.get()) {
+                            Throwable error = lastError.get();
+                            log.warn("[流式结束] 流式过程中出现错误 userId={} conversationId={} errorType={} errorMsg={}",
+                                    userId, conversationId, error.getClass().getSimpleName(), error.getMessage());
+
+                            // 如果是EOFException且内容很少，补充错误提示
+                            if ((error instanceof java.io.EOFException ||
+                                 (error.getMessage() != null && error.getMessage().contains("EOF"))) &&
+                                full.length() < 50) {
+                                if (full.isBlank()) {
+                                    full = "AI服务连接不稳定，请稍后重试。";
+                                } else {
+                                    full += "\n\n（AI服务连接异常，可能回答不完整）";
+                                }
+                            }
+                        }
+
                         // 流式因异常结束（如 API EOF）且几乎无内容时，不追加 RAG 检索图，避免「图生图失败却展示检索图」的混淆
                         if (reactor.core.publisher.SignalType.ON_ERROR.equals(signalType) && full.length() < 30) {
                             if (full.isBlank()) {
-                                full = "生成出错，请重试。";
+                                full = "AI服务暂时不可用，请重试。";
                             }
                         }
                         boolean mentionDetected = mentionsSpouse(safeQuestion);

@@ -26,11 +26,10 @@ spring:
   data:
     redis:
       # Redis 仅用于用户等缓存；连不上时仅打 WARN，不中断请求（见 RedisCacheConfig.CacheErrorHandler）
-      host: ${REDIS_HOST:42.192.61.108}
+      host: ${REDIS_HOST:175.24.205.213}
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:}
       timeout: 3000ms
-      connect-timeout: 5000
       lettuce:
         pool:
           max-active: 8
@@ -57,12 +56,17 @@ spring:
     port: 587
     username: anmory@qq.com
     password: hwvmqukwraoljici
+    protocol: smtp
     properties:
       mail:
         smtp:
           auth: true
           starttls:
             enable: true
+          ssl:
+            trust: smtp.qq.com
+        transport:
+          protocol: smtp
   servlet:
     multipart:
       max-file-size: 500MB   # 单个文件最大500MB

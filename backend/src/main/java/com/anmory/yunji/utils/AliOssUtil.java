@@ -7,7 +7,11 @@ import com.aliyun.oss.OSSException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.multipart.MultipartFile;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.util.UUID;
 
 @Slf4j
@@ -145,8 +149,18 @@ public class AliOssUtil {
             if (originalFilename != null && originalFilename.contains(".")) {
                 suffix = originalFilename.substring(originalFilename.lastIndexOf("."));
             }
+
+            byte[] imageBytes = file.getBytes();
+
+            // 检查是否为WebP格式，如果是则转换为JPG
+            if (isWebpFormat(suffix, imageBytes)) {
+                imageBytes = convertWebpToJpg(imageBytes);
+                suffix = ".jpg";
+                log.info("检测到WebP格式图片，已转换为JPG格式");
+            }
+
             String objectKey = generateChatImageObjectKey(userId, suffix);
-            return upload(file.getBytes(), objectKey);
+            return upload(imageBytes, objectKey);
         } catch (Exception e) {
             log.error("聊天图片上传失败(用户图片)", e);
             throw new RuntimeException("聊天图片上传失败");
@@ -244,6 +258,43 @@ public class AliOssUtil {
         } finally {
             if (ossClient != null) {
                 ossClient.shutdown();
+            }
+        }
+    }
+
+    /**
+     * 检查图片是否为WebP格式
+     */
+    private boolean isWebpFormat(String suffix, byte[] imageBytes) {
+        if (suffix != null && suffix.toLowerCase().contains("webp")) {
+            return true;
+        }
+        // 通过文件头检测WebP格式
+        if (imageBytes.length >= 12) {
+            // WebP文件头: RIFF + 文件大小 + WEBP
+            return imageBytes[0] == 'R' && imageBytes[1] == 'I' && imageBytes[2] == 'F' && imageBytes[3] == 'F' &&
+                   imageBytes[8] == 'W' && imageBytes[9] == 'E' && imageBytes[10] == 'B' && imageBytes[11] == 'P';
+        }
+        return false;
+    }
+
+    /**
+     * 将WebP格式图片转换为JPG格式
+     */
+    private byte[] convertWebpToJpg(byte[] webpBytes) throws IOException {
+        try (ByteArrayInputStream inputStream = new ByteArrayInputStream(webpBytes)) {
+            BufferedImage image = ImageIO.read(inputStream);
+            if (image == null) {
+                throw new IOException("无法读取WebP图片");
+            }
+
+            try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
+                // 转换为JPG格式
+                boolean success = ImageIO.write(image, "jpg", outputStream);
+                if (!success) {
+                    throw new IOException("图片格式转换失败");
+                }
+                return outputStream.toByteArray();
             }
         }
     }

@@ -77,39 +77,60 @@ public class PdfExportServiceImpl implements PdfExportService {
         if (fontTitle != null) return;
         BaseFont bf = null;
         try {
-            String[] paths = {
-                    "C:/Windows/Fonts/STZHONGS.TTF",
-                    "C:/Windows/Fonts/stzhongs.ttf",
-                    "C:/Windows/Fonts/msyh.ttc,0",
-                    "C:/Windows/Fonts/simsun.ttc,0",
-                    "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
-                    "/System/Library/Fonts/PingFang.ttc",
-            };
-            for (String path : paths) {
-                try {
-                    bf = BaseFont.createFont(path, BaseFont.IDENTITY_H, BaseFont.EMBEDDED);
-                    break;
-                } catch (Exception ignored) {}
+            // 优先尝试从classpath加载字体
+            try (InputStream is = getClass().getResourceAsStream("/fonts/NotoSansCJK-Regular.otf")) {
+                if (is != null) {
+                    byte[] fontData = is.readAllBytes();
+                    bf = BaseFont.createFont("NotoSansCJK-Regular.otf", BaseFont.IDENTITY_H, BaseFont.EMBEDDED, true, fontData, null);
+                    log.info("成功从classpath加载中文字体: /fonts/NotoSansCJK-Regular.otf");
+                }
+            } catch (Exception e) {
+                log.debug("Classpath字体加载失败", e);
             }
+
+            // 如果classpath字体加载失败，尝试系统字体路径
             if (bf == null) {
-                try (InputStream is = getClass().getResourceAsStream("/fonts/NotoSansCJK-Regular.ttc")) {
-                    if (is != null) {
-                        bf = BaseFont.createFont("NotoSansCJK-Regular.ttc", BaseFont.IDENTITY_H, BaseFont.EMBEDDED, true, is.readAllBytes(), null);
+                String[] paths = {
+                        "C:/Windows/Fonts/STZHONGS.TTF",
+                        "C:/Windows/Fonts/stzhongs.ttf",
+                        "C:/Windows/Fonts/msyh.ttc,0",
+                        "C:/Windows/Fonts/simsun.ttc,0",
+                        "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
+                        "/System/Library/Fonts/PingFang.ttc",
+                };
+                for (String path : paths) {
+                    try {
+                        bf = BaseFont.createFont(path, BaseFont.IDENTITY_H, BaseFont.EMBEDDED);
+                        log.info("成功从系统路径加载中文字体: {}", path);
+                        break;
+                    } catch (Exception ignored) {
+                        log.debug("系统字体路径 {} 不可用", path);
                     }
-                } catch (Exception e) {
-                    log.debug("Classpath 字体加载失败", e);
                 }
             }
+
+            // 如果所有字体都加载失败，使用内置字体但尝试更好的中文字体支持
             if (bf == null) {
-                log.warn("未找到中文字体，使用默认字体，中文可能无法正确显示");
-                bf = BaseFont.createFont(BaseFont.HELVETICA, BaseFont.WINANSI, BaseFont.NOT_EMBEDDED);
+                log.warn("未找到中文字体，尝试使用内置字体，中文显示可能受限");
+                try {
+                    // 尝试使用iText内置的CJK字体
+                    bf = BaseFont.createFont("STSong-Light", "UniGB-UCS2-H", BaseFont.NOT_EMBEDDED);
+                    log.info("使用iText内置中文字体: STSong-Light");
+                } catch (Exception e) {
+                    log.warn("iText内置中文字体也无法加载，使用默认Helvetica字体", e);
+                    bf = BaseFont.createFont(BaseFont.HELVETICA, BaseFont.WINANSI, BaseFont.NOT_EMBEDDED);
+                }
             }
+
             fontTitle = new Font(bf, 14, Font.BOLD, new Color(45, 43, 41));
             fontBody = new Font(bf, 11, Font.NORMAL, new Color(55, 53, 51));
             fontCaption = new Font(bf, 9, Font.NORMAL, new Color(120, 118, 115));
             fontCover = new Font(bf, 24, Font.BOLD, new Color(60, 58, 56));
+
+            log.info("PDF字体初始化完成，使用字体: {}", bf.getPostscriptFontName());
         } catch (Exception e) {
-            log.warn("未找到中文字体，使用默认字体，中文可能无法正确显示", e);
+            log.error("字体初始化失败，使用默认Helvetica字体", e);
+            // 最后的兜底方案
             fontTitle = FontFactory.getFont(FontFactory.HELVETICA, 14, Font.BOLD);
             fontBody = FontFactory.getFont(FontFactory.HELVETICA, 11);
             fontCaption = FontFactory.getFont(FontFactory.HELVETICA, 9);
@@ -150,28 +171,43 @@ public class PdfExportServiceImpl implements PdfExportService {
 
             doc.open();
 
-            addCover(doc, username, userId);
+            // 添加封面
+            try {
+                addCover(doc, username, userId);
+            } catch (Exception e) {
+                log.warn("PDF封面添加失败，使用默认封面", e);
+                addDefaultCover(doc, username);
+            }
             doc.newPage();
 
+            // 添加记录内容
             int index = 1;
             for (EnrichedMemoItem item : items) {
-                addRecord(doc, index++, item);
+                try {
+                    addRecord(doc, index++, item);
+                } catch (Exception e) {
+                    log.warn("PDF记录添加失败，跳过记录 index={}, type={}, error={}", index - 1, item.getType(), e.getMessage());
+                    // 继续处理其他记录
+                }
             }
 
+            // 添加AI总结，如果失败则添加默认结语
             try {
                 addAiSummary(doc, items, username);
             } catch (Exception e) {
-                log.warn("PDF 结语页添加失败，使用默认结语", e);
+                log.warn("PDF AI总结页添加失败，使用默认结语", e);
                 try {
                     addDefaultClosingPage(doc);
                 } catch (Exception e2) {
                     log.error("默认结语页写入失败", e2);
                 }
             }
+
             doc.close();
+            log.info("PDF导出成功，共{}条记录", items.size());
         } catch (Exception e) {
-            log.error("PDF 导出失败", e);
-            throw new RuntimeException("PDF 导出失败: " + e.getMessage());
+            log.error("PDF导出失败", e);
+            throw new RuntimeException("PDF导出失败: " + e.getMessage(), e);
         }
     }
 
@@ -349,6 +385,39 @@ public class PdfExportServiceImpl implements PdfExportService {
         Paragraph line = new Paragraph("— · — · — · —", fontCaption);
         line.setAlignment(Element.ALIGN_CENTER);
         line.setSpacingBefore(pregnancyWeekStr != null ? 0 : 40);
+        doc.add(line);
+
+        Paragraph date = new Paragraph("导出时间 " + java.time.LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy年M月d日 HH:mm")), fontCaption);
+        date.setAlignment(Element.ALIGN_CENTER);
+        date.setSpacingBefore(16);
+        doc.add(date);
+
+        Paragraph footer = new Paragraph("愿此刻的记录，成为永恒的美好", fontCaption);
+        footer.setAlignment(Element.ALIGN_CENTER);
+        footer.setSpacingBefore(80);
+        doc.add(footer);
+    }
+
+    /** 默认封面（addCover 异常时兜底） */
+    private void addDefaultCover(Document doc, String username) throws DocumentException {
+        Paragraph ornament = new Paragraph("❀  ✦  ❀", fontCaption);
+        ornament.setAlignment(Element.ALIGN_CENTER);
+        ornament.setSpacingBefore(120);
+        doc.add(ornament);
+
+        Paragraph title = new Paragraph("孕期纪念册", fontCover);
+        title.setAlignment(Element.ALIGN_CENTER);
+        title.setSpacingBefore(24);
+        doc.add(title);
+
+        Paragraph sub = new Paragraph(username + " 的珍藏时光", fontBody);
+        sub.setAlignment(Element.ALIGN_CENTER);
+        sub.setSpacingBefore(32);
+        doc.add(sub);
+
+        Paragraph line = new Paragraph("— · — · — · —", fontCaption);
+        line.setAlignment(Element.ALIGN_CENTER);
+        line.setSpacingBefore(40);
         doc.add(line);
 
         Paragraph date = new Paragraph("导出时间 " + java.time.LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy年M月d日 HH:mm")), fontCaption);

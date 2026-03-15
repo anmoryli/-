@@ -1,8 +1,8 @@
 package com.anmory.yunji.service.impl;
 
 import com.anmory.yunji.service.MailService;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -13,14 +13,18 @@ import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import java.nio.charset.StandardCharsets;
 
-@Slf4j
 @Service
-@RequiredArgsConstructor
 public class MailServiceImpl implements MailService {
+
+    private static final Logger log = LoggerFactory.getLogger(MailServiceImpl.class);
 
     private static final String DEFAULT_FROM = "noreply@yunqibao.local";
 
     private final JavaMailSender mailSender;
+
+    public MailServiceImpl(JavaMailSender mailSender) {
+        this.mailSender = mailSender;
+    }
 
     @Value("${spring.mail.username:}")
     private String from;
@@ -42,12 +46,24 @@ public class MailServiceImpl implements MailService {
             log.warn("[邮件] 收件人地址无效，跳过发送 to={}", to);
             return;
         }
-        SimpleMailMessage message = new SimpleMailMessage();
-        message.setFrom(getFromAddress());
-        message.setTo(to.trim());
-        message.setSubject(subject != null ? subject : "");
-        message.setText(content != null ? content : "");
-        mailSender.send(message);
+        Thread t = Thread.currentThread();
+        ClassLoader prev = t.getContextClassLoader();
+        try {
+            // 异步线程（如 PDF 导出的 ForkJoinPool）的 ContextClassLoader 可能看不到应用 jar，导致
+            // ServiceLoader 找不到 jakarta.mail.util.StreamProvider，统一用本类的 ClassLoader 再发邮件
+            t.setContextClassLoader(MailServiceImpl.class.getClassLoader());
+            SimpleMailMessage message = new SimpleMailMessage();
+            message.setFrom(getFromAddress());
+            message.setTo(to.trim());
+            message.setSubject(subject != null ? subject : "");
+            message.setText(content != null ? content : "");
+            mailSender.send(message);
+        } catch (Exception e) {
+            log.error("[邮件] 发送失败 to={}", to, e);
+            throw new RuntimeException("邮件发送失败", e);
+        } finally {
+            t.setContextClassLoader(prev);
+        }
     }
 
     @Override
@@ -76,7 +92,10 @@ public class MailServiceImpl implements MailService {
             log.warn("[邮件] 收件人地址无效，跳过发送 to={}", to);
             return;
         }
+        Thread thread = Thread.currentThread();
+        ClassLoader prev = thread.getContextClassLoader();
         try {
+            thread.setContextClassLoader(MailServiceImpl.class.getClassLoader());
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, StandardCharsets.UTF_8.name());
             helper.setFrom(getFromAddress());
@@ -90,6 +109,8 @@ public class MailServiceImpl implements MailService {
         } catch (MessagingException e) {
             log.warn("[邮件] 带附件 HTML 发送失败 to={}", to, e);
             throw new RuntimeException("邮件发送失败", e);
+        } finally {
+            thread.setContextClassLoader(prev);
         }
     }
 
@@ -122,5 +143,6 @@ public class MailServiceImpl implements MailService {
         String escaped = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br>");
         return "<p style=\"margin:0 0 12px 0;color:#3D3B39;\">" + escaped + "</p>";
     }
+
 }
 

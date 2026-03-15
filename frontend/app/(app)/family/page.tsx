@@ -183,8 +183,15 @@ export default function FamilyPage() {
 
   const copyCode = () => {
     if (family?.inviteCode) {
-      navigator.clipboard.writeText(family.inviteCode)
-      toast.success("邀请码已复制")
+      if (typeof navigator !== 'undefined' && navigator.clipboard) {
+        navigator.clipboard.writeText(family.inviteCode).then(() => {
+          toast.success("邀请码已复制")
+        }).catch(() => {
+          toast.error("复制失败")
+        })
+      } else {
+        toast.error("浏览器不支持复制功能")
+      }
     }
   }
 
