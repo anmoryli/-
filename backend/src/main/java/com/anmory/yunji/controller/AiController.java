@@ -20,6 +20,7 @@ import com.anmory.yunji.mapper.AiGenerationPostCommentLikeMapper;
 import com.anmory.yunji.mapper.FamilyMemberMapper;
 import com.anmory.yunji.entity.Family;
 import com.anmory.yunji.service.ConversationService;
+import com.anmory.yunji.service.EmotionPregnancyService;
 import com.anmory.yunji.service.FamilyService;
 import com.anmory.yunji.service.MailService;
 import com.anmory.yunji.service.MemoService;
@@ -87,6 +88,7 @@ public class AiController {
     private final PromptService promptService;
     private final FamilyMemberMapper familyMemberMapper;
     private final FamilyService familyService;
+    private final EmotionPregnancyService emotionPregnancyService;
     private final MailService mailService;
     private final ScheduledOperationMapper scheduledOperationMapper;
     private final ScheduleDraftStore scheduleDraftStore;
@@ -162,7 +164,27 @@ public class AiController {
             return Result.error(403, ErrorCode.FORBIDDEN.key(), "无权限或会话不存在");
         }
         List<Message> history = messageService.getHistory(conversationId);
+        conversationService.markRead(userId, conversationId);
         return Result.success(history);
+    }
+
+    /** 标记会话已读（清除未读 AI 红点） */
+    @PostMapping("/conversation/markRead")
+    public Result<Void> markConversationRead(@RequestParam Integer userId,
+                                            @RequestParam Integer conversationId) {
+        Conversation conv = conversationService.getByIdAndUserId(conversationId, userId);
+        if (conv == null) {
+            return Result.error(403, ErrorCode.FORBIDDEN.key(), "无权限或会话不存在");
+        }
+        conversationService.markRead(userId, conversationId);
+        return Result.success(null);
+    }
+
+    /** 是否存在未读 AI 消息（供孕期小伴 Tab 红点） */
+    @GetMapping("/conversation/hasUnread")
+    public Result<Boolean> hasUnread(@RequestParam Integer userId) {
+        boolean has = conversationService.hasAnyUnreadAi(userId);
+        return Result.success(has);
     }
 
     /**
@@ -269,6 +291,7 @@ public class AiController {
                 String imageUrl = generateImageFromText(userId, safeQuestion);
                 String answer = "这是我为你生成的图片：\n\n![AI生成图片](" + imageUrl + ")";
                 messageService.save(conversationId, userId, answer, true);
+                conversationService.setUnreadAi(conversationId);
                 emitter.send(SseEmitter.event().data(answer));
                 emitter.send(SseEmitter.event().name("done").data(""));
                 emitter.complete();
@@ -297,6 +320,7 @@ public class AiController {
                     aiGenerationPostMapper.insert(post);
                 }
                 messageService.save(conversationId, userId, answer, true);
+                conversationService.setUnreadAi(conversationId);
                 emitter.send(SseEmitter.event().data(answer));
                 emitter.send(SseEmitter.event().name("done").data(""));
                 emitter.complete();
@@ -472,6 +496,7 @@ public class AiController {
                             }
                             messageService.save(conversationId, userId, safeQuestion, false, true);
                             messageService.save(conversationId, userId, reply, true);
+                            conversationService.setUnreadAi(conversationId);
                             emitter.send(SseEmitter.event().data(reply));
                             emitter.send(SseEmitter.event().name("done").data(""));
                             emitter.complete();
@@ -491,6 +516,7 @@ public class AiController {
                         String reply = replyToUser != null && !replyToUser.isBlank() ? replyToUser : "还需要一点信息哦：请补充时间、地点和要做什么。";
                         messageService.save(conversationId, userId, safeQuestion, false, true);
                         messageService.save(conversationId, userId, reply, true);
+                        conversationService.setUnreadAi(conversationId);
                         emitter.send(SseEmitter.event().data(reply));
                         emitter.send(SseEmitter.event().name("done").data(""));
                         emitter.complete();
@@ -619,7 +645,7 @@ public class AiController {
                                 List<Integer> spouseIds = family != null ? familyService.getSpouseUserIds(userId) : List.of();
                                 log.info("[配偶提及] spouseIds={}", spouseIds);
                                 if (spouseIds == null || spouseIds.isEmpty()) {
-                                    appendText = "\n\n您家里还没有添加配偶，无法代为发送。请先在「家人共享」中设置配偶。";
+                                    appendText = "\n\n你家里还没有添加配偶，无法代为发送。请先在「我们的小家」中设置配偶。";
                                     log.info("[配偶提及] 家庭内无配偶，追加提示 userId={} conversationId={}", userId, conversationId);
                                 } else {
                                     User me = userService.getById(userId);
@@ -633,7 +659,9 @@ public class AiController {
                                                 String snippet = safeQuestion.length() > 100 ? safeQuestion.substring(0, 100) + "…" : safeQuestion;
                                                 String body = String.format("你好，%s\n\n%s 在 AI 对话中提到了你。\n\n内容摘要：%s\n\n快去孕期宝看看吧～",
                                                         spouse.getUsername(), meName, snippet);
-                                                mailService.sendTextMail(spouse.getEmail(), subject, body);
+                                                String htmlBody = com.anmory.yunji.service.impl.MailServiceImpl.wrapHtmlBodyWithStyle(
+                                                        com.anmory.yunji.service.impl.MailServiceImpl.textToHtmlParagraphs(body));
+                                                mailService.sendHtmlMail(spouse.getEmail(), subject, htmlBody);
                                                 sent = true;
                                                 log.info("[配偶提及] 已发送邮件 userId={} toSpouse={} email={}", userId, sid, spouse.getEmail());
                                                 break;
@@ -660,7 +688,9 @@ public class AiController {
                                         String snippet = safeQuestion.length() > 100 ? safeQuestion.substring(0, 100) + "…" : safeQuestion;
                                         String body = String.format("你好，%s\n\n%s 在 AI 对话中提到了你。\n\n内容摘要：%s\n\n快去孕期宝看看吧～",
                                                 creator.getUsername(), meName, snippet);
-                                        mailService.sendTextMail(creator.getEmail(), subject, body);
+                                        String htmlBody = com.anmory.yunji.service.impl.MailServiceImpl.wrapHtmlBodyWithStyle(
+                                                com.anmory.yunji.service.impl.MailServiceImpl.textToHtmlParagraphs(body));
+                                        mailService.sendHtmlMail(creator.getEmail(), subject, htmlBody);
                                         appendText = "\n\n已发送给老婆了。";
                                         log.info("[配偶提及] 配偶发邮件给孕妇 userId={} creatorId={} email={}", userId, family.getCreatorUserId(), creator.getEmail());
                                     } catch (Exception ex) {
@@ -689,6 +719,7 @@ public class AiController {
                         }
                         String finalMessage = full + ragImageAppend + appendText;
                         messageService.save(conversationId, userId, finalMessage, true);
+                        conversationService.setUnreadAi(conversationId);
                         if (ragImageAppend.length() > 0) {
                             emitter.send(SseEmitter.event().data(ragImageAppend.toString()));
                         }
@@ -704,11 +735,12 @@ public class AiController {
                         try {
                             String full = fullAnswer.toString();
                             messageService.save(conversationId, userId, full, true);
+                            conversationService.setUnreadAi(conversationId);
                         } catch (Exception saveEx) {
                             log.warn("[流式] 仅保存原文失败", saveEx);
                         }
                         try {
-                            emitter.send(SseEmitter.event().data("\n\n回复已保存，通知发送若失败请稍后在家人共享中查看。"));
+                            emitter.send(SseEmitter.event().data("\n\n回复已保存，通知发送若失败请稍后在我们的小家中查看。"));
                             emitter.send(SseEmitter.event().name("done").data(""));
                             emitter.complete();
                         } catch (IOException io) {
@@ -766,6 +798,7 @@ public class AiController {
                 + "用户问题：" + question;
         String answer = client.prompt().user(userPrompt).call().content();
         messageService.save(conversationId, userId, answer, true);
+        conversationService.setUnreadAi(conversationId);
 
         return Result.success(answer);
     }
@@ -1383,14 +1416,14 @@ public class AiController {
         if (w == 0 && user.getLastMenstrualDate() != null) {
             try {
                 String ws = PregnancyWeekUtil.calculatePregnancyWeek(user.getLastMenstrualDate()).replaceAll("\\D", "");
-                w = ws.isEmpty() ? 20 : Math.min(40, Math.max(4, Integer.parseInt(ws)));
+                w = ws.isEmpty() ? 20 : Math.min(52, Math.max(4, Integer.parseInt(ws)));
             } catch (Exception e) {
                 w = 20;
             }
         }
         if (w == 0) w = 20;
         if (w < 4) w = 4;
-        if (w > 40) w = 40;
+        if (w > 52) w = 52;
         String promptStr = promptService.getUserPrompt("baby_growth", "default", Map.of("week", String.valueOf(w)));
         if (promptStr == null || promptStr.isBlank()) promptStr = "用户当前孕" + w + "周，请用2-3句话描述宝宝本周发育情况，温馨简洁，不要换行。";
         String result = ChatClient.builder(openAiChatModel).build()
@@ -1398,7 +1431,7 @@ public class AiController {
         return Result.success(result != null ? result.trim() : "");
     }
 
-    /** 本周提示：调用 AI 生成一行提示 */
+    /** 本周小贴士：调用 AI 生成一行提示 */
     @GetMapping("/weeklyTip")
     public Result<String> weeklyTip(@RequestParam Integer userId,
                                    @RequestParam(defaultValue = "0") int week) {
@@ -1408,20 +1441,61 @@ public class AiController {
         if (w == 0 && user.getLastMenstrualDate() != null) {
             try {
                 String ws = PregnancyWeekUtil.calculatePregnancyWeek(user.getLastMenstrualDate()).replaceAll("\\D", "");
-                w = ws.isEmpty() ? 20 : Math.min(40, Math.max(4, Integer.parseInt(ws)));
+                w = ws.isEmpty() ? 20 : Math.min(52, Math.max(4, Integer.parseInt(ws)));
             } catch (Exception e) {
                 w = 20;
             }
         }
         if (w == 0) w = 20;
         if (w < 4) w = 4;
-        if (w > 40) w = 40;
+        if (w > 52) w = 52;
         String promptStr = promptService.getUserPrompt("weekly_tip", "default", Map.of("week", String.valueOf(w)));
         if (promptStr == null || promptStr.isBlank()) promptStr = "孕" + w + "周：请用一句话给出本周最重要的孕期提示，不超过30字，不要换行、不要序号、不要引号，直接输出内容。";
         String result = ChatClient.builder(openAiChatModel).build()
                 .prompt().user(promptStr).call().content();
         if (result != null) {
             result = result.replaceAll("[\\r\\n]+", " ").trim();
+        }
+        return Result.success(result != null ? result : "保持好心情，注意均衡饮食");
+    }
+
+    /** 本周提醒 AI：基于上周摘要 + 当前孕周，生成 ≤20 字提示；供主页「本周小贴士」优先使用 */
+    @GetMapping("/weeklyReminder")
+    public Result<String> weeklyReminder(@RequestParam Integer userId,
+                                         @RequestParam(defaultValue = "0") int week) {
+        User user = userService.getById(userId);
+        if (user == null) return Result.error(404, ErrorCode.NOT_FOUND.key(), "用户不存在");
+        int w = week > 0 ? week : 0;
+        if (w == 0 && user.getLastMenstrualDate() != null) {
+            try {
+                String ws = PregnancyWeekUtil.calculatePregnancyWeek(user.getLastMenstrualDate()).replaceAll("\\D", "");
+                w = ws.isEmpty() ? 20 : Math.min(52, Math.max(4, Integer.parseInt(ws)));
+            } catch (Exception e) {
+                w = 20;
+            }
+        }
+        if (w == 0) w = 20;
+        if (w < 4) w = 4;
+        if (w > 52) w = 52;
+        String lastWeekSummary = "";
+        try {
+            lastWeekSummary = emotionPregnancyService.getLastWeekSummary(userId);
+        } catch (Exception e) {
+            log.debug("getLastWeekSummary failed, using empty", e);
+        }
+        if (lastWeekSummary == null) lastWeekSummary = "暂无上周记录";
+        String userPrompt = promptService.getUserPrompt("weekly_reminder_ai", "default",
+                Map.of("week", String.valueOf(w), "lastWeekSummary", lastWeekSummary));
+        String systemPrompt = promptService.getSystemPrompt("weekly_reminder_ai", "default");
+        if (userPrompt == null || userPrompt.isBlank()) {
+            userPrompt = "当前孕周：" + w + "周。上周情况：" + lastWeekSummary + "。请生成一句本周提醒（严格不超过20字），直接输出内容。";
+        }
+        var builder = ChatClient.builder(openAiChatModel).build().prompt();
+        if (systemPrompt != null && !systemPrompt.isBlank()) builder = builder.system(systemPrompt);
+        String result = builder.user(userPrompt).call().content();
+        if (result != null) {
+            result = result.replaceAll("[\\r\\n]+", " ").trim();
+            if (result.length() > 20) result = result.substring(0, 20);
         }
         return Result.success(result != null ? result : "保持好心情，注意均衡饮食");
     }

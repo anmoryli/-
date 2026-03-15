@@ -45,4 +45,23 @@ public class ConversationServiceImpl implements ConversationService {
     public boolean delete(Integer userId, Integer conversationId) {
         return conversationMapper.deleteByIdAndUserId(conversationId, userId) > 0;
     }
+
+    @Override
+    public void markRead(Integer userId, Integer conversationId) {
+        Conversation c = conversationMapper.selectByIdAndUserId(conversationId, userId);
+        if (c != null) {
+            conversationMapper.updateHasUnreadAi(conversationId, false);
+        }
+    }
+
+    @Override
+    public void setUnreadAi(Integer conversationId) {
+        conversationMapper.updateHasUnreadAi(conversationId, true);
+    }
+
+    @Override
+    public boolean hasAnyUnreadAi(Integer userId) {
+        List<Conversation> list = conversationMapper.selectByUserId(userId);
+        return list != null && list.stream().anyMatch(c -> Boolean.TRUE.equals(c.getHasUnreadAi()));
+    }
 }

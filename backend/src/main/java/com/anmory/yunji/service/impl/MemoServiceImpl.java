@@ -416,6 +416,20 @@ public class MemoServiceImpl implements MemoService {
         return filtered;
     }
 
+    @Override
+    public Memo getMemoByIdIfVisible(Integer memoId, Integer requestUserId) {
+        if (memoId == null || requestUserId == null) return null;
+        Memo memo = memoMapper.selectByIdCompat(memoId);
+        if (memo == null) return null;
+        if (requestUserId.equals(memo.getUserId())) return memo;
+        if (!familyService.canViewRecord(memo.getUserId(), requestUserId)) {
+            log.info("[可见范围] getMemoByIdIfVisible memoId={} requestUserId={} 与 owner 非同一家庭", memoId, requestUserId);
+            return null;
+        }
+        if (!isMemoVisibleTo(memo, requestUserId)) return null;
+        return memo;
+    }
+
     private boolean isMemoVisibleTo(Memo m, Integer requestUserId) {
         String mode = m.getVisibilityMode();
         if (mode == null || mode.isBlank()) mode = "all";

@@ -3,8 +3,13 @@ package com.anmory.yunji.mapper;
 import com.anmory.yunji.entity.Family;
 import org.apache.ibatis.annotations.*;
 
+import java.util.List;
+
 @Mapper
 public interface FamilyMapper {
+
+    @Select("SELECT * FROM family ORDER BY family_id ASC")
+    List<Family> selectAll();
 
     @Insert("INSERT INTO family (creator_user_id, invite_code, invite_expires_at, created_at, updated_at) " +
             "VALUES (#{creatorUserId}, #{inviteCode}, #{inviteExpiresAt}, NOW(), NOW())")

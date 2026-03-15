@@ -12,6 +12,9 @@ import java.time.Period;
 @Slf4j
 public class PregnancyWeekUtil {
 
+    /** 孕周上限（放宽约 3 个月，约 52 周 = 1 年） */
+    public static final int MAX_PREGNANCY_WEEK = 52;
+
     /**
      * 计算孕周
      * @param lastMenstrualDate 末次月经日期（yyyy-MM-dd）
@@ -31,11 +34,11 @@ public class PregnancyWeekUtil {
             long totalDays = period.getYears() * 365L + period.getMonths() * 30L + period.getDays();
             int week = (int) (totalDays / 7);
 
-            // 边界处理：小于1周显示0周，大于40周显示40+周
+            // 边界处理：小于1周显示0周，大于上限显示 52+周
             if (week < 1) {
                 return "0周";
-            } else if (week > 40) {
-                return "40+周";
+            } else if (week > MAX_PREGNANCY_WEEK) {
+                return MAX_PREGNANCY_WEEK + "+周";
             } else {
                 return week + "周";
             }
@@ -56,16 +59,27 @@ public class PregnancyWeekUtil {
 
         if (week < 1) {
             return "0周";
-        } else if (week > 40) {
-            return "40+周";
+        } else if (week > MAX_PREGNANCY_WEEK) {
+            return MAX_PREGNANCY_WEEK + "+周";
         } else {
             return week + "周";
         }
     }
 
+    /**
+     * 根据末次月经日期和给定日期计算孕周索引（0~52）
+     */
+    public static int getWeekIndex(LocalDate lastMenstrualDate, LocalDate date) {
+        if (lastMenstrualDate == null || date == null) return 0;
+        long days = java.time.temporal.ChronoUnit.DAYS.between(lastMenstrualDate, date);
+        int week = (int) (days / 7);
+        if (week < 0) return 0;
+        return Math.min(week, MAX_PREGNANCY_WEEK);
+    }
+
     /** 宝宝大小类比描述（用于 PDF 封面等），仅使用安全、健康的比喻 */
     public static String getBabySizeDescription(int week) {
-        if (week < 4 || week > 40) return "";
+        if (week < 4 || week > MAX_PREGNANCY_WEEK) return "";
         String[] names = {
             "芝麻粒", "芝麻", "小扁豆", "蓝莓", "覆盆子", "葡萄", "金桔", "无花果", "青柠", "柠檬",
             "桃子", "苹果", "牛油果", "梨", "红薯", "芒果", "香蕉", "胡萝卜", "木瓜", "葡萄柚",

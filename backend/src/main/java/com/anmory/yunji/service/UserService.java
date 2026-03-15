@@ -29,6 +29,15 @@ public interface UserService {
 
     void changePassword(Integer userId, String oldPassword, String newPassword);
 
+    /** 向用户绑定邮箱发送 6 位验证码（登录后改密用），未绑定邮箱抛异常 */
+    void sendPasswordCodeToUserEmail(Integer userId);
+
+    /** 向指定邮箱发送 6 位验证码（找回密码用），邮箱未绑定用户抛异常 */
+    void sendPasswordCodeToEmail(String email);
+
+    /** 凭邮箱验证码修改密码：登录后传 userId，未登录传 email */
+    void changePasswordByCode(Integer userId, String email, String code, String newPassword);
+
     User uploadAvatar(Integer userId, MultipartFile file);
 
     User updateAvatar(Integer userId, MultipartFile file);

@@ -1,5 +1,7 @@
 package com.anmory.yunji.service.impl;
 
+import com.anmory.yunji.common.ErrorCode;
+import com.anmory.yunji.common.RagService;
 import com.anmory.yunji.entity.Family;
 import com.anmory.yunji.entity.FamilyMember;
 import com.anmory.yunji.entity.FamilyTask;
@@ -7,6 +9,7 @@ import com.anmory.yunji.entity.User;
 import com.anmory.yunji.exception.BusinessException;
 import com.anmory.yunji.mapper.FamilyMemberMapper;
 import com.anmory.yunji.mapper.FamilyTaskMapper;
+import com.anmory.yunji.mapper.FamilyTaskWeekSentMapper;
 import com.anmory.yunji.service.FamilyService;
 import com.anmory.yunji.service.FamilyTaskService;
 import com.anmory.yunji.service.MailService;
@@ -35,6 +38,7 @@ import java.util.Map;
 public class FamilyTaskServiceImpl implements FamilyTaskService {
 
     private final FamilyTaskMapper familyTaskMapper;
+    private final FamilyTaskWeekSentMapper familyTaskWeekSentMapper;
     private final FamilyService familyService;
     private final UserNotificationService userNotificationService;
     private final UserService userService;
@@ -43,6 +47,7 @@ public class FamilyTaskServiceImpl implements FamilyTaskService {
     private final PromptService promptService;
     private final OpenAiChatModel openAiChatModel;
     private final ObjectMapper objectMapper;
+    private final RagService ragService;
 
     @Override
     public List<FamilyTask> listByAssignee(Integer userId) {
@@ -107,6 +112,30 @@ public class FamilyTaskServiceImpl implements FamilyTaskService {
         familyTaskMapper.complete(taskId, LocalDateTime.now());
         t.setStatus("completed");
         t.setCompletedAt(LocalDateTime.now());
+        try {
+            Family family = familyService.getMyFamily(userId);
+            if (family != null && family.getCreatorUserId() != null && !family.getCreatorUserId().equals(userId)) {
+                Integer creatorUserId = family.getCreatorUserId();
+                String title = "爸爸完成了一条小任务";
+                String body = (t.getTitle() != null && !t.getTitle().isBlank())
+                        ? "「" + t.getTitle() + "」已完成，快去夸夸他吧～"
+                        : "快去夸夸他吧～";
+                userNotificationService.notifySystem(creatorUserId, title, body);
+                User mom = userService.getById(creatorUserId);
+                if (mom != null && mom.getEmail() != null && !mom.getEmail().isBlank()) {
+                    String mailBody = String.format(
+                            "你好，%s\n\n老公完成了「%s」任务，快去夸夸他吧～\n\n—— 孕期宝 · 爸爸成长营",
+                            mom.getUsername(),
+                            t.getTitle() != null ? t.getTitle() : "小任务"
+                    );
+                    String htmlBody = MailServiceImpl.wrapHtmlBodyWithStyle(MailServiceImpl.textToHtmlParagraphs(mailBody));
+                    mailService.sendHtmlMail(mom.getEmail(), "爸爸完成了一条小任务", htmlBody);
+                    log.info("[爸爸成长营] 已向妈妈发送完成任务通知邮件 creatorUserId={}", creatorUserId);
+                }
+            }
+        } catch (Exception e) {
+            log.warn("[爸爸成长营] 完成任务通知妈妈失败 taskId={}", taskId, e);
+        }
         return t;
     }
 
@@ -135,7 +164,8 @@ public class FamilyTaskServiceImpl implements FamilyTaskService {
                     t.getTitle(),
                     t.getDescription() != null ? t.getDescription() : ""
                 );
-                mailService.sendTextMail(assignee.getEmail(), subject, body);
+                String htmlBody = MailServiceImpl.wrapHtmlBodyWithStyle(MailServiceImpl.textToHtmlParagraphs(body));
+                mailService.sendHtmlMail(assignee.getEmail(), subject, htmlBody);
                 log.info("[爸爸成长营] 已向配偶发送任务提醒邮件 assigneeUserId={} taskId={}", assigneeUserId, t.getId());
             } catch (Exception e) {
                 log.warn("[爸爸成长营] 任务提醒邮件发送失败 assigneeUserId={}", assigneeUserId, e);
@@ -149,27 +179,98 @@ public class FamilyTaskServiceImpl implements FamilyTaskService {
     public List<FamilyTask> generateTasksForWeek(Integer userId) {
         Family family = familyService.getMyFamily(userId);
         if (family == null) throw new BusinessException("您还未创建或加入家庭");
-        List<FamilyMember> members = familyMemberMapper.findByFamilyId(family.getFamilyId());
         Integer creatorId = family.getCreatorUserId();
         User creator = userService.getById(creatorId);
         int weekNum = 0;
         if (creator != null && creator.getLastMenstrualDate() != null) {
             String w = PregnancyWeekUtil.calculatePregnancyWeek(creator.getLastMenstrualDate());
             try {
-                weekNum = Integer.parseInt(w.replaceAll("\\D", "").replaceFirst("^0+", "").trim());
+                String num = w.replaceAll("\\D", "").replaceFirst("^0+", "").trim();
+                weekNum = num.isEmpty() ? 0 : Math.min(52, Integer.parseInt(num));
             } catch (NumberFormatException ignored) {}
         }
+        if (familyTaskWeekSentMapper.existsByFamilyAndWeek(family.getFamilyId(), weekNum) != null) {
+            throw new BusinessException(ErrorCode.CONFLICT.code(), ErrorCode.CONFLICT.key(),
+                    "本周已发送过，如需继续添加请到爸爸成长营添加");
+        }
+        String recentSummary = "";
+        try {
+            String rag = ragService.getRelevant("近期记录 孕周 产检 陪伴", creatorId, true, 5);
+            if (rag != null && !rag.isBlank() && !rag.contains("暂时不可用") && !rag.contains("异常")) {
+                recentSummary = rag.length() > 400 ? rag.substring(0, 400) : rag;
+            }
+        } catch (Exception e) {
+            log.debug("RAG 检索失败，继续生成任务", e);
+        }
+        if (recentSummary.isEmpty()) recentSummary = "暂无近期记录";
+        List<FamilyTask> existing = familyTaskMapper.selectByFamilyId(family.getFamilyId());
+        String existingTasks = existing.isEmpty() ? "无" : existing.stream()
+                .map(t -> t.getTitle() + (t.getDescription() != null ? "：" + t.getDescription() : ""))
+                .reduce((a, b) -> a + "；" + b).orElse("无");
+        String weekStr = weekNum > 0 ? weekNum + "周" : "未知";
+        String promptStr = promptService.getUserPrompt("family_task_generate", "default",
+                Map.of("week", weekStr, "recentSummary", recentSummary, "existingTasks", existingTasks));
+        if (promptStr == null || promptStr.isBlank()) {
+            promptStr = "当前孕周：" + weekStr + "。近期记录摘要：" + recentSummary + "。已有任务摘要：" + existingTasks
+                    + "。请生成 3～5 条本周任务建议，输出 JSON 数组：[{\"title\":\"...\",\"description\":\"...\"}]";
+        }
+        List<Map<String, String>> suggestions;
+        try {
+            String out = ChatClient.builder(openAiChatModel).build().prompt().user(promptStr).call().content();
+            if (out == null || out.isBlank()) suggestions = List.of();
+            else suggestions = parseTaskSuggestions(out);
+        } catch (Exception e) {
+            log.warn("AI 生成本周任务失败，使用默认两条", e);
+            suggestions = List.of(
+                    Map.of("title", "本周陪同产检", "description", weekNum > 0 ? "孕" + weekNum + "周，请陪妈妈产检，给予支持。" : "请陪妈妈产检，给予支持。"),
+                    Map.of("title", "每日一个拥抱", "description", "给准妈妈一个拥抱，增进感情。")
+            );
+        }
+        List<FamilyMember> members = familyMemberMapper.findByFamilyId(family.getFamilyId());
         List<FamilyTask> created = new ArrayList<>();
-        for (FamilyMember m : members) {
+        for (FamilyMember m : members != null ? members : List.<FamilyMember>of()) {
             if (m.getUserId().equals(creatorId)) continue;
             if (!Boolean.TRUE.equals(m.getIsSpouse())) continue;
-            int w = weekNum;
-            String title1 = "本周陪同产检";
-            String desc1 = w > 0 ? "孕" + w + "周，请陪妈妈产检，给予支持。" : "请陪妈妈产检，给予支持。";
-            created.add(createTask(family.getFamilyId(), m.getUserId(), title1, desc1, "routine"));
-            created.add(createTask(family.getFamilyId(), m.getUserId(), "每日一个拥抱", "给准妈妈一个拥抱，增进感情。", "emotion"));
+            for (Map<String, String> sug : suggestions) {
+                String title = sug.getOrDefault("title", "").trim();
+                if (title.isEmpty()) continue;
+                if (title.length() > 15) title = title.substring(0, 15);
+                String desc = sug.getOrDefault("description", "").trim();
+                String taskType = title.contains("拥抱") || title.contains("陪伴") ? "emotion" : "routine";
+                created.add(createTask(family.getFamilyId(), m.getUserId(), title, desc, taskType));
+            }
+        }
+        if (!created.isEmpty()) {
+            familyTaskWeekSentMapper.insert(family.getFamilyId(), weekNum);
         }
         return created;
+    }
+
+    private List<Map<String, String>> parseTaskSuggestions(String out) {
+        String json = out.trim();
+        if (json.startsWith("```")) {
+            int first = json.indexOf('\n');
+            int last = json.lastIndexOf("```");
+            if (first >= 0 && last > first) json = json.substring(first + 1, last).trim();
+        }
+        int start = json.indexOf('[');
+        int end = json.lastIndexOf(']');
+        if (start >= 0 && end > start) json = json.substring(start, end + 1);
+        try {
+            JsonNode arr = objectMapper.readTree(json);
+            List<Map<String, String>> result = new ArrayList<>();
+            for (JsonNode node : arr) {
+                String title = node.has("title") ? node.get("title").asText("").trim() : "";
+                if (title.isEmpty()) continue;
+                if (title.length() > 15) title = title.substring(0, 15);
+                String description = node.has("description") ? node.get("description").asText("").trim() : "";
+                result.add(Map.of("title", title, "description", description));
+            }
+            return result;
+        } catch (Exception e) {
+            log.warn("解析任务 JSON 失败: {}", e.getMessage());
+            return List.of();
+        }
     }
 
     @Override
@@ -199,16 +300,25 @@ public class FamilyTaskServiceImpl implements FamilyTaskService {
             String out = client.prompt().user(promptStr).call().content();
             if (out == null || out.isBlank()) return List.of();
             String json = out.trim();
+            if (json.startsWith("```")) {
+                int first = json.indexOf('\n');
+                int last = json.lastIndexOf("```");
+                if (first >= 0 && last > first) json = json.substring(first + 1, last).trim();
+            }
             int start = json.indexOf('[');
             int end = json.lastIndexOf(']');
             if (start >= 0 && end > start) json = json.substring(start, end + 1);
             JsonNode arr = objectMapper.readTree(json);
             List<Map<String, String>> result = new ArrayList<>();
             for (JsonNode node : arr) {
+                String title = node.has("title") ? node.get("title").asText("").trim() : "";
+                if (title.isBlank()) continue;
+                if (title.length() > 15) title = title.substring(0, 15);
+                String description = node.has("description") ? node.get("description").asText("").trim() : "";
                 Map<String, String> m = new HashMap<>();
-                m.put("title", node.has("title") ? node.get("title").asText("") : "");
-                m.put("description", node.has("description") ? node.get("description").asText("") : "");
-                if (!m.get("title").isBlank()) result.add(m);
+                m.put("title", title);
+                m.put("description", description);
+                result.add(m);
             }
             return result;
         } catch (Exception e) {

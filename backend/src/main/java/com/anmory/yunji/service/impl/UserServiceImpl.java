@@ -4,6 +4,7 @@ import com.anmory.yunji.entity.User;
 import com.anmory.yunji.exception.BusinessException;
 import com.anmory.yunji.mapper.UserMapper;
 
+import com.anmory.yunji.service.MailService;
 import com.anmory.yunji.service.UserService;
 import com.anmory.yunji.utils.AliOssUtil;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,10 +15,14 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.DigestUtils;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
+import java.util.Random;
+
+import org.springframework.data.redis.core.StringRedisTemplate;
 
 @Service
 public class UserServiceImpl implements UserService {
@@ -30,6 +35,16 @@ public class UserServiceImpl implements UserService {
 
     @Autowired(required = false)
     private CacheManager cacheManager;
+
+    @Autowired(required = false)
+    private StringRedisTemplate stringRedisTemplate;
+
+    @Autowired
+    private MailService mailService;
+
+    private static final String REDIS_KEY_PWD_CODE = "pwd_code:";
+    private static final Duration PWD_CODE_TTL = Duration.ofMinutes(10);
+    private static final Random RANDOM = new Random();
 
     @Override
     public void register(String username, String password, String email, String userType, LocalDate lastMenstrualDate, LocalDateTime pregnancyTime, String defaultRelationship) {
@@ -173,22 +188,22 @@ public class UserServiceImpl implements UserService {
     @Override
     @CacheEvict(value = "user", key = "#userId")
     public void bindEmail(Integer userId, String email) {
-        if (email != null && !email.isEmpty()){
-            //校验是否绑定了
-            User user =userMapper.selectByEmail(email);
-            if (user!=null){
-                throw new BusinessException("该邮箱已被绑定");
-            }
-            //校验userId是否存在
-            user = userMapper.selectById(userId);
-            if (user==null){
-                throw new BusinessException("用户不存在");
-            }
-            //绑定邮箱
-            user.setEmail(email);
-            user.setUpdatedAt(LocalDateTime.now());
-            userMapper.update(user);
+        if (email == null || email.isBlank()) return;
+        User current = userMapper.selectById(userId);
+        if (current == null) {
+            throw new BusinessException("用户不存在");
         }
+        String trimmed = email.trim();
+        if (trimmed.equals(current.getEmail())) {
+            return;
+        }
+        User other = userMapper.selectByEmail(trimmed);
+        if (other != null && !other.getUserId().equals(userId)) {
+            throw new BusinessException("该邮箱已被其他账号绑定");
+        }
+        current.setEmail(trimmed);
+        current.setUpdatedAt(LocalDateTime.now());
+        userMapper.update(current);
     }
 
     @Override
@@ -225,6 +240,63 @@ public class UserServiceImpl implements UserService {
         user.setPasswordHash(newHash);
         user.setUpdatedAt(LocalDateTime.now());
         userMapper.update(user);
+    }
+
+    @Override
+    public void sendPasswordCodeToUserEmail(Integer userId) {
+        User user = userMapper.selectById(userId);
+        if (user == null) throw new BusinessException("用户不存在");
+        String email = user.getEmail();
+        if (email == null || email.isBlank()) throw new BusinessException("请先绑定邮箱");
+        sendPasswordCodeToEmail(email.trim());
+    }
+
+    @Override
+    public void sendPasswordCodeToEmail(String email) {
+        if (email == null || email.isBlank()) throw new BusinessException("请输入邮箱");
+        String trimmed = email.trim();
+        User user = userMapper.selectByEmail(trimmed);
+        if (user == null) throw new BusinessException("该邮箱未绑定任何账号");
+        if (stringRedisTemplate == null) throw new BusinessException("验证码服务暂不可用，请稍后再试");
+        String code = String.format("%06d", 100000 + RANDOM.nextInt(900000));
+        String key = REDIS_KEY_PWD_CODE + trimmed;
+        stringRedisTemplate.opsForValue().set(key, code, PWD_CODE_TTL);
+        String subject = "孕期宝 - 验证码";
+        String content = "您的验证码是：" + code + "，10分钟内有效。如非本人操作请忽略。";
+        mailService.sendTextMail(trimmed, subject, content);
+    }
+
+    @Override
+    public void changePasswordByCode(Integer userId, String email, String code, String newPassword) {
+        String targetEmail;
+        if (userId != null) {
+            User user = userMapper.selectById(userId);
+            if (user == null) throw new BusinessException("用户不存在");
+            targetEmail = user.getEmail();
+            if (targetEmail == null || targetEmail.isBlank()) throw new BusinessException("请先绑定邮箱");
+            targetEmail = targetEmail.trim();
+        } else if (email != null && !email.isBlank()) {
+            targetEmail = email.trim();
+        } else {
+            throw new BusinessException("请提供用户或邮箱");
+        }
+        if (code == null || code.isBlank()) throw new BusinessException("请输入验证码");
+        if (newPassword == null || newPassword.length() < 6) throw new BusinessException("新密码至少6位");
+        if (stringRedisTemplate == null) throw new BusinessException("验证码服务暂不可用，请稍后再试");
+        String key = REDIS_KEY_PWD_CODE + targetEmail;
+        String stored = stringRedisTemplate.opsForValue().get(key);
+        if (stored == null || !stored.trim().equals(code.trim())) throw new BusinessException("验证码错误或已过期");
+        stringRedisTemplate.delete(key);
+        User user = userMapper.selectByEmail(targetEmail);
+        if (user == null) throw new BusinessException("用户不存在");
+        String newHash = DigestUtils.md5DigestAsHex(newPassword.getBytes());
+        user.setPasswordHash(newHash);
+        user.setUpdatedAt(LocalDateTime.now());
+        userMapper.update(user);
+        if (cacheManager != null && user.getUserId() != null) {
+            var cache = cacheManager.getCache("user");
+            if (cache != null) cache.evict(user.getUserId());
+        }
     }
 
     @Override

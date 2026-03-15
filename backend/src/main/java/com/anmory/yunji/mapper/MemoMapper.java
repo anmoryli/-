@@ -81,6 +81,9 @@ public interface MemoMapper {
     @Update("UPDATE yunfu.memo SET category = #{category}, updated_at = NOW() WHERE memo_id = #{memoId}")
     int updateCategory(@Param("memoId") Integer memoId, @Param("category") String category);
 
+    @Update("UPDATE yunfu.memo SET mood = #{mood}, updated_at = NOW() WHERE memo_id = #{memoId}")
+    int updateMood(@Param("memoId") Integer memoId, @Param("mood") String mood);
+
     @Update("UPDATE yunfu.memo SET visibility_mode = #{visibilityMode}, visible_to = #{visibleTo}, updated_at = NOW() WHERE memo_id = #{memoId}")
     int updateVisibility(@Param("memoId") Integer memoId, @Param("visibilityMode") String visibilityMode, @Param("visibleTo") String visibleTo);
 
@@ -283,6 +286,9 @@ public interface MemoMapper {
 
     @Select("SELECT DISTINCT DATE(created_at) FROM yunfu.memo WHERE user_id = #{userId} AND created_at >= #{from} ORDER BY DATE(created_at) DESC")
     List<LocalDate> selectDistinctRecordDates(@Param("userId") Integer userId, @Param("from") LocalDate from);
+
+    @Select("SELECT COUNT(*) FROM yunfu.memo WHERE user_id = #{userId} AND DATE(created_at) >= #{from} AND DATE(created_at) <= #{to}")
+    int countByUserAndDateRange(@Param("userId") Integer userId, @Param("from") LocalDate from, @Param("to") LocalDate to);
 
     @Select("SELECT COUNT(*) FROM yunfu.memo WHERE user_id = #{userId}")
     int countByUserId(@Param("userId") Integer userId);

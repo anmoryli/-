@@ -56,6 +56,10 @@ public class PdfExportServiceImpl implements PdfExportService {
     private static final float IMAGE_MAX_WIDTH = Math.min(CONTENT_WIDTH - CELL_PAD, 400);
     private static final float IMAGE_MAX_HEIGHT = 320;
 
+    /** PDF 结语页默认文案（AI 总结失败或写 PDF 异常时使用） */
+    private static final String DEFAULT_PDF_CLOSING =
+            "愿这段珍贵的孕期时光，成为您与家人最温暖的回忆。祝宝宝健康出生，家庭幸福美满。";
+
     private final MemoService memoService;
     private final OpenAiChatModel openAiChatModel;
     private final PromptService promptService;
@@ -154,12 +158,41 @@ public class PdfExportServiceImpl implements PdfExportService {
                 addRecord(doc, index++, item);
             }
 
-            addAiSummary(doc, items, username);
+            try {
+                addAiSummary(doc, items, username);
+            } catch (Exception e) {
+                log.warn("PDF 结语页添加失败，使用默认结语", e);
+                try {
+                    addDefaultClosingPage(doc);
+                } catch (Exception e2) {
+                    log.error("默认结语页写入失败", e2);
+                }
+            }
             doc.close();
         } catch (Exception e) {
             log.error("PDF 导出失败", e);
             throw new RuntimeException("PDF 导出失败: " + e.getMessage());
         }
+    }
+
+    /** 仅追加一页默认结语（addAiSummary 异常时兜底） */
+    private void addDefaultClosingPage(Document doc) throws DocumentException {
+        doc.newPage();
+        Paragraph header = new Paragraph("—— 结语 · 寄语 ——", fontTitle);
+        header.setAlignment(Element.ALIGN_CENTER);
+        header.setSpacingBefore(100);
+        header.setSpacingAfter(32);
+        doc.add(header);
+        Paragraph p = new Paragraph(DEFAULT_PDF_CLOSING, fontBody);
+        p.setAlignment(Element.ALIGN_CENTER);
+        p.setLeading(32);
+        p.setSpacingBefore(16);
+        p.setSpacingAfter(48);
+        doc.add(p);
+        Paragraph sign = new Paragraph("—— 孕期宝 · 温暖陪伴每一天 ——", fontCaption);
+        sign.setAlignment(Element.ALIGN_CENTER);
+        sign.setSpacingBefore(24);
+        doc.add(sign);
     }
 
     @Override
@@ -332,7 +365,7 @@ public class PdfExportServiceImpl implements PdfExportService {
     private void addAiSummary(Document doc, List<EnrichedMemoItem> items, String username) throws DocumentException {
         String summary = generateAiSummary(items, username);
         if (summary == null || summary.isEmpty()) {
-            summary = "愿这段珍贵的孕期时光，成为您与家人最温暖的回忆。祝宝宝健康出生，家庭幸福美满。";
+            summary = DEFAULT_PDF_CLOSING;
         }
         doc.newPage();
         Paragraph header = new Paragraph("—— 结语 · 寄语 ——", fontTitle);

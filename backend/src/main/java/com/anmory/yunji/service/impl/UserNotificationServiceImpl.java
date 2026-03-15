@@ -55,7 +55,7 @@ public class UserNotificationServiceImpl implements UserNotificationService {
         n.setUserId(userId);
         n.setType("reminder");
         n.setTitle(title);
-        n.setBody("您还未添加配偶，请在家人共享中添加配偶后再为TA分配任务。");
+        n.setBody("你还未添加配偶，请在我们的小家中添加配偶后再为 TA 分配任务。");
         n.setRelatedTaskId(null);
         userNotificationMapper.insert(n);
     }

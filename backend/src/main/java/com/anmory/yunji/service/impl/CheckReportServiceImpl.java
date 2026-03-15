@@ -83,7 +83,8 @@ public class CheckReportServiceImpl implements CheckReportService {
                 }
                 String subject = "孕期检查提醒";
                 String content = buildMailContent(report);
-                mailService.sendTextMail(user.getEmail(), subject, content);
+                String htmlBody = MailServiceImpl.wrapHtmlBodyWithStyle(MailServiceImpl.textToHtmlParagraphs(content));
+                mailService.sendHtmlMail(user.getEmail(), subject, htmlBody);
                 checkReportMapper.updateSendStatus(report.getReportId(), true, "sent", report.getRetryCount());
             } catch (Exception ex) {
                 log.warn("检查提醒发送失败 reportId={}", report.getReportId(), ex);

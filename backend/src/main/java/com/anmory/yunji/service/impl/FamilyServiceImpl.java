@@ -135,12 +135,24 @@ public class FamilyServiceImpl implements FamilyService {
         Integer creatorId = family.getCreatorUserId();
         User creator = userService.getById(creatorId);
         if (creator == null) return null;
+        int recordCountMom = memoMapper.countByUserId(creatorId);
+        List<FamilyMember> members = familyMemberMapper.findByFamilyId(family.getFamilyId());
+        int recordCountDad = 0;
+        for (FamilyMember m : members != null ? members : List.<FamilyMember>of()) {
+            if (Boolean.TRUE.equals(m.getIsSpouse()) && m.getUserId() != null && !m.getUserId().equals(creatorId)) {
+                recordCountDad += memoMapper.countByUserId(m.getUserId());
+            }
+        }
+        int recordCountTotal = recordCountMom + recordCountDad;
         Map<String, Object> out = new HashMap<>();
         out.put("creatorUserId", creatorId);
         out.put("creatorUsername", creator.getUsername());
         out.put("lastMenstrualDate", creator.getLastMenstrualDate() != null ? creator.getLastMenstrualDate().toString() : null);
         out.put("pregnancyTime", creator.getPregnancyTime() != null ? creator.getPregnancyTime().toString() : null);
-        out.put("recordCount", memoMapper.countByUserId(creatorId));
+        out.put("recordCount", recordCountMom);
+        out.put("recordCountTotal", recordCountTotal);
+        out.put("recordCountMom", recordCountMom);
+        out.put("recordCountDad", recordCountDad);
         return out;
     }
 

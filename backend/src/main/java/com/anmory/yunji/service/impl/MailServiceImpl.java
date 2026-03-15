@@ -95,10 +95,32 @@ public class MailServiceImpl implements MailService {
 
     /** 与 APP 风格一致的暖色系 HTML 模板（浅粉/米色背景、深灰文字、圆角卡片感） */
     public static String wrapHtmlBody(String innerContent) {
-        return "<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"></head><body style=\"margin:0;padding:20px;background:#faf6f4;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#2d2b29;line-height:1.6;\">"
-                + "<div style=\"max-width:560px;margin:0 auto;background:#fff;border-radius:16px;padding:24px;box-shadow:0 2px 12px rgba(0,0,0,0.06);\">"
+        return wrapHtmlBodyWithStyle(innerContent);
+    }
+
+    /**
+     * 与 app 一致：配色 + 渐变背景；可选缓动动画（部分邮件客户端不支持，以渐变 fallback 为主）。
+     * 色值对应 globals.css：background #FDFAF7，gradient-b #F5F0EC，gradient-c #F0EDE8，accent #E3B8B0，sage #B8CBB3。
+     */
+    public static String wrapHtmlBodyWithStyle(String innerContent) {
+        String bodyStyle = "margin:0;padding:20px;background:#FDFAF7;background-image:linear-gradient(135deg,#FDFAF7 0%,#F5F0EC 40%,#F0EDE8 70%,#FDFAF7 100%);background-size:200% 200%;"
+                + "font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#3D3B39;line-height:1.6;";
+        return "<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
+                + "<style type=\"text/css\">"
+                + "@keyframes mailGradientDrift{0%,100%{background-position:0% 50%;}50%{background-position:100% 50%;}}"
+                + "body.mail-app-style{animation:mailGradientDrift 20s ease-in-out infinite;}"
+                + "</style></head>"
+                + "<body class=\"mail-app-style\" style=\"" + bodyStyle + "\">"
+                + "<div style=\"max-width:560px;margin:0 auto;background:#FEFCFA;border-radius:16px;padding:24px;box-shadow:0 2px 12px rgba(0,0,0,0.06);border:1px solid rgba(139,135,132,0.12);\">"
                 + (innerContent != null ? innerContent : "")
                 + "</div></body></html>";
+    }
+
+    /** 将纯文本转为 HTML 段落（用于原 sendTextMail 改为 HTML 时） */
+    public static String textToHtmlParagraphs(String text) {
+        if (text == null || text.isBlank()) return "";
+        String escaped = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br>");
+        return "<p style=\"margin:0 0 12px 0;color:#3D3B39;\">" + escaped + "</p>";
     }
 }
 

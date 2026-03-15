@@ -44,11 +44,13 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
 
 @Slf4j
 @RestController
@@ -275,22 +277,35 @@ public class MemoController {
 
     // ========== 语音记录 ==========
     @RequestMapping("/addVoice")
-    public Result<Integer> addVoice(@RequestParam("userId") Integer userId,
+    public Result<Integer> addVoice(@RequestParam(value = "userId", required = false) Integer userId,
                                     @RequestParam(value = "title", required = false) String title,
                                     @RequestParam("file") MultipartFile file,
                                     @RequestParam(value = "mood", required = false) String mood,
                                     @RequestParam(value = "visibilityMode", required = false) String visibilityMode,
                                     @RequestParam(value = "visibleTo", required = false) String visibleTo,
                                     @RequestParam(value = "category", required = false) String category) {
-        String voiceUrl = aliOssUtil.uploadVoice(userId, file);
-        String lastMenstrualDate = getLastMenstrualDate(userId);
-        String pregnancyWeek = PregnancyWeekUtil.calculatePregnancyWeek(lastMenstrualDate);
-        String saveTitle = (title != null && !title.trim().isEmpty()) ? title.trim() : "语音记录";
-        String mode = (visibilityMode != null && !visibilityMode.isBlank()) ? visibilityMode : (visibleTo != null && !visibleTo.isBlank() ? "allowlist" : "all");
-        String finalVisibleTo = validateAndNormalizeVisibleTo(userId, mode, visibleTo);
-        Integer memoId = memoService.addVoiceMemo(userId, saveTitle, voiceUrl, pregnancyWeek, mood, mode, finalVisibleTo, category);
-        mentionMailService.notifySpouseNewRecordAsync(userId, memoId, "voice", saveTitle, null);
-        return Result.success(memoId);
+        if (userId == null) {
+            return Result.error("缺少 userId");
+        }
+        if (file == null || file.isEmpty()) {
+            return Result.error("请选择要上传的语音文件");
+        }
+        try {
+            String voiceUrl = aliOssUtil.uploadVoice(userId, file);
+            String lastMenstrualDate = getLastMenstrualDate(userId);
+            String pregnancyWeek = PregnancyWeekUtil.calculatePregnancyWeek(lastMenstrualDate);
+            String saveTitle = (title != null && !title.trim().isEmpty()) ? title.trim() : "语音记录";
+            String mode = (visibilityMode != null && !visibilityMode.isBlank()) ? visibilityMode : (visibleTo != null && !visibleTo.isBlank() ? "allowlist" : "all");
+            String finalVisibleTo = validateAndNormalizeVisibleTo(userId, mode, visibleTo);
+            Integer memoId = memoService.addVoiceMemo(userId, saveTitle, voiceUrl, pregnancyWeek, mood, mode, finalVisibleTo, category);
+            mentionMailService.notifySpouseNewRecordAsync(userId, memoId, "voice", saveTitle, null);
+            return Result.success(memoId);
+        } catch (Exception e) {
+            log.error("语音上传失败 userId={}", userId, e);
+            String msg = e.getMessage() != null && !e.getMessage().isBlank() ? e.getMessage() : "语音上传失败，请稍后重试";
+            if (msg.length() > 80) msg = msg.substring(0, 80) + "…";
+            return Result.error(500, "VOICE_UPLOAD_FAILED", msg);
+        }
     }
 
     @RequestMapping("/deleteVoice")
@@ -318,61 +333,84 @@ public class MemoController {
 
     // ========== 文件记录 ==========
     @RequestMapping("/addFile")
-    public Result<Integer> addFile(@RequestParam("userId") Integer userId,
+    public Result<Integer> addFile(@RequestParam(value = "userId", required = false) Integer userId,
                                    @RequestParam(value = "title", required = false) String title,
                                    @RequestParam("file") MultipartFile file,
                                    @RequestParam(value = "mood", required = false) String mood,
                                    @RequestParam(value = "visibilityMode", required = false) String visibilityMode,
                                    @RequestParam(value = "visibleTo", required = false) String visibleTo,
                                    @RequestParam(value = "category", required = false) String category) {
-        String fileUrl = aliOssUtil.uploadFile(userId, file);
-        String lastMenstrualDate = getLastMenstrualDate(userId);
-        String pregnancyWeek = PregnancyWeekUtil.calculatePregnancyWeek(lastMenstrualDate);
-        if (title == null || title.trim().isEmpty()) {
-            String promptKey = isSpouseUser(userId) ? "memo_file_title_dad" : "memo_file_title";
-            String promptStr = promptService.getUserPrompt(promptKey, "default",
-                    java.util.Map.of("fileName", file.getOriginalFilename() != null ? file.getOriginalFilename() : ""));
-            if (promptStr == null || promptStr.isBlank()) promptStr = "请为上传的孕期文件生成一个简洁的标题（不超过20字），文件名：" + (file.getOriginalFilename() != null ? file.getOriginalFilename() : "");
-            title = chatClient.prompt().user(promptStr).call().content();
+        if (userId == null) {
+            return Result.error("缺少 userId");
         }
-        String mode = (visibilityMode != null && !visibilityMode.isBlank()) ? visibilityMode : (visibleTo != null && !visibleTo.isBlank() ? "allowlist" : "all");
-        String finalVisibleTo = validateAndNormalizeVisibleTo(userId, mode, visibleTo);
-        Integer memoId = memoService.addFileMemo(userId, title, fileUrl, pregnancyWeek, mood, mode, finalVisibleTo, category);
-        mentionMailService.notifySpouseNewRecordAsync(userId, memoId, "file", title, null);
-        String fn = file.getOriginalFilename();
-        final String embedFileUrl = fileUrl;
-        if (fn != null && fn.toLowerCase().endsWith(".pdf")) {
-            final int uid = userId;
-            final int mid = memoId;
-            byte[] pdfBytes;
-            try {
-                pdfBytes = file.getInputStream().readAllBytes();
-            } catch (Exception e) {
-                log.warn("PDF 读取失败 memoId={}", memoId, e);
-                pdfBytes = null;
+        if (file == null || file.isEmpty()) {
+            return Result.error("请选择要上传的文件");
+        }
+        try {
+            String fileUrl = aliOssUtil.uploadFile(userId, file);
+            String lastMenstrualDate = getLastMenstrualDate(userId);
+            String pregnancyWeek = PregnancyWeekUtil.calculatePregnancyWeek(lastMenstrualDate);
+            if (title == null || title.trim().isEmpty()) {
+                try {
+                    String promptKey = isSpouseUser(userId) ? "memo_file_title_dad" : "memo_file_title";
+                    String promptStr = promptService.getUserPrompt(promptKey, "default",
+                            java.util.Map.of("fileName", file.getOriginalFilename() != null ? file.getOriginalFilename() : ""));
+                    if (promptStr == null || promptStr.isBlank()) promptStr = "请为上传的孕期文件生成一个简洁的标题（不超过20字），文件名：" + (file.getOriginalFilename() != null ? file.getOriginalFilename() : "");
+                    String aiTitle = chatClient.prompt().user(promptStr).call().content();
+                    if (aiTitle != null && !aiTitle.trim().isEmpty()) title = aiTitle.trim();
+                } catch (Exception e) {
+                    log.warn("文件标题 AI 生成失败，使用文件名", e);
+                }
+                if (title == null || title.trim().isEmpty()) {
+                    String fn = file.getOriginalFilename();
+                    title = (fn != null && !fn.isBlank()) ? fn : "文件";
+                    if (title.length() > 20) title = title.substring(0, 20);
+                }
             }
-            if (pdfBytes != null && pdfBytes.length > 0) {
-                final byte[] bytesToExtract = pdfBytes;
-                CompletableFuture.runAsync(() -> {
-                    try {
-                        String extracted = extractPdfTextFromBytes(bytesToExtract);
-                        if (extracted != null && !extracted.isBlank()) {
-                            String withUrl = embedFileUrl != null && !embedFileUrl.isBlank()
-                                    ? extracted + "\n[URL] " + embedFileUrl : extracted;
-                            ragService.embedAsync(uid, withUrl, "memo", String.valueOf(mid));
+            String mode = (visibilityMode != null && !visibilityMode.isBlank()) ? visibilityMode : (visibleTo != null && !visibleTo.isBlank() ? "allowlist" : "all");
+            String finalVisibleTo = validateAndNormalizeVisibleTo(userId, mode, visibleTo);
+            Integer memoId = memoService.addFileMemo(userId, title, fileUrl, pregnancyWeek, mood, mode, finalVisibleTo, category);
+            mentionMailService.notifySpouseNewRecordAsync(userId, memoId, "file", title, null);
+            String fn = file.getOriginalFilename();
+            final String embedFileUrl = fileUrl;
+            if (fn != null && fn.toLowerCase().endsWith(".pdf")) {
+                final int uid = userId;
+                final int mid = memoId;
+                byte[] pdfBytes;
+                try {
+                    pdfBytes = file.getInputStream().readAllBytes();
+                } catch (Exception e) {
+                    log.warn("PDF 读取失败 memoId={}", memoId, e);
+                    pdfBytes = null;
+                }
+                if (pdfBytes != null && pdfBytes.length > 0) {
+                    final byte[] bytesToExtract = pdfBytes;
+                    CompletableFuture.runAsync(() -> {
+                        try {
+                            String extracted = extractPdfTextFromBytes(bytesToExtract);
+                            if (extracted != null && !extracted.isBlank()) {
+                                String withUrl = embedFileUrl != null && !embedFileUrl.isBlank()
+                                        ? extracted + "\n[URL] " + embedFileUrl : extracted;
+                                ragService.embedAsync(uid, withUrl, "memo", String.valueOf(mid));
+                            }
+                        } catch (Exception e) {
+                            log.warn("PDF 文字提取或嵌入失败 memoId={}", mid, e);
                         }
-                    } catch (Exception e) {
-                        log.warn("PDF 文字提取或嵌入失败 memoId={}", mid, e);
-                    }
-                });
+                    });
+                }
+            } else {
+                String fileText = (title != null && !title.isBlank() ? title : "文件");
+                if (embedFileUrl != null && !embedFileUrl.isBlank()) {
+                    ragService.embedAsync(userId, fileText + "\n[URL] " + embedFileUrl, "memo", String.valueOf(memoId));
+                }
             }
-        } else {
-            String fileText = (title != null && !title.isBlank() ? title : "文件");
-            if (embedFileUrl != null && !embedFileUrl.isBlank()) {
-                ragService.embedAsync(userId, fileText + "\n[URL] " + embedFileUrl, "memo", String.valueOf(memoId));
-            }
+            return Result.success(memoId);
+        } catch (Exception e) {
+            log.error("文件上传失败 userId={} fileName={}", userId, file.getOriginalFilename(), e);
+            String msg = e.getMessage() != null && !e.getMessage().isBlank() ? e.getMessage() : "文件上传失败，请稍后重试";
+            if (msg.length() > 80) msg = msg.substring(0, 80) + "…";
+            return Result.error(500, "FILE_UPLOAD_FAILED", msg);
         }
-        return Result.success(memoId);
     }
 
     private String extractPdfTextFromBytes(byte[] pdfBytes) {
@@ -486,6 +524,69 @@ public class MemoController {
         return Result.success(fileList);
     }
 
+    /** 按 ID 获取单条记录详情（含权限校验），用于详情页在列表中未命中时的回退请求。 */
+    @RequestMapping("/getById")
+    public Result<Map<String, Object>> getMemoById(@RequestParam("memoId") Integer memoId,
+                                                   @RequestParam("requestUserId") Integer requestUserId) {
+        Memo memo = memoService.getMemoByIdIfVisible(memoId, requestUserId);
+        if (memo == null) {
+            return Result.error(404, "NOT_FOUND", "记录不存在或已删除");
+        }
+        Map<String, Object> out = new HashMap<>();
+        out.put("memoId", memo.getMemoId());
+        out.put("userId", memo.getUserId());
+        out.put("type", memo.getType());
+        out.put("tag", memo.getTag());
+        out.put("createdAt", memo.getCreatedAt());
+        out.put("pregnancyWeek", memo.getPregnancyWeek());
+        out.put("pregnancyWeekIndex", memo.getPregnancyWeekIndex());
+        out.put("recordWeightKg", memo.getRecordWeightKg());
+        out.put("mood", memo.getMood());
+        out.put("category", memo.getCategory());
+        out.put("photoDescription", memo.getPhotoDescription());
+        out.put("visibilityMode", memo.getVisibilityMode());
+        out.put("visibleTo", memo.getVisibleTo());
+        String recordBy = null;
+        com.anmory.yunji.entity.Family family = familyService.getMyFamily(requestUserId);
+        if (family != null && family.getCreatorUserId() != null) {
+            if (memo.getUserId().equals(family.getCreatorUserId())) recordBy = "mom";
+            else {
+                List<Integer> spouseIds = familyService.getSpouseUserIds(family.getCreatorUserId());
+                if (spouseIds != null && spouseIds.contains(memo.getUserId())) recordBy = "dad";
+            }
+        }
+        out.put("recordBy", recordBy);
+        if ("text".equals(memo.getType())) {
+            Text text = textMapper.selectByMemoId(memoId);
+            if (text != null) {
+                out.put("title", text.getTitle());
+                out.put("content", text.getContent());
+                out.put("textId", text.getTextId());
+            }
+        } else if ("voice".equals(memo.getType())) {
+            List<Voice> voices = memoService.getVoiceByUserId(memo.getUserId());
+            Voice voice = voices != null ? voices.stream().filter(v -> memoId.equals(v.getMemoId())).findFirst().orElse(null) : null;
+            if (voice != null) {
+                out.put("title", voice.getTitle());
+                out.put("voiceUrl", voice.getUrl());
+                out.put("voiceId", voice.getVoiceId());
+            }
+        } else if ("photo".equals(memo.getType())) {
+            List<Photo> photos = memoService.getPhotoByUserId(memo.getUserId());
+            List<String> urls = photos != null ? photos.stream().filter(p -> memoId.equals(p.getMemoId())).map(Photo::getUrl).collect(Collectors.toList()) : List.of();
+            out.put("photoUrls", urls);
+        } else if ("file".equals(memo.getType())) {
+            List<File> files = memoService.getFileByUserId(memo.getUserId());
+            File file = files != null ? files.stream().filter(f -> memoId.equals(f.getMemoId())).findFirst().orElse(null) : null;
+            if (file != null) {
+                out.put("title", file.getTitle());
+                out.put("fileUrl", file.getUrl());
+                out.put("fileId", file.getFileId());
+            }
+        }
+        return Result.success(out);
+    }
+
     // ========== 所有记录 ==========
     /** 家庭记录：一次返回妈妈+爸爸的可见记录，用于时间轴分栏与筛选。返回 mom / dad 两个列表，前端合并并加 recordBy。 */
     @RequestMapping("/getFamilyEnriched")
@@ -564,8 +665,8 @@ public class MemoController {
         }
         String toEmail = (emailParam != null && !emailParam.isBlank()) ? emailParam.trim() : (user.getEmail() != null && !user.getEmail().isBlank() ? user.getEmail().trim() : null);
         if (toEmail == null || !toEmail.contains("@")) {
-            userNotificationService.notifySystem(userId, "导出失败", "请先绑定邮箱后再导出 PDF。");
-            return ResponseEntity.badRequest().body(Result.error("请先绑定邮箱"));
+            userNotificationService.notifySystem(userId, "导出失败", "请先设置邮箱后再导出 PDF。");
+            return ResponseEntity.badRequest().body(Result.error("请先设置邮箱"));
         }
         LocalDate fromDate = null;
         LocalDate toDate = null;

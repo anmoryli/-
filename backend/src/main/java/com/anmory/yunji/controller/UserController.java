@@ -82,6 +82,30 @@ public class UserController {
         return Result.success();
     }
 
+    /** 发送修改密码验证码：登录后传 userId 发到绑定邮箱；未登录传 email 用于找回密码 */
+    @PostMapping("/sendPasswordCode")
+    public Result<Void> sendPasswordCode(@RequestParam(value = "userId", required = false) Integer userId,
+                                         @RequestParam(value = "email", required = false) String email) {
+        if (userId != null) {
+            userService.sendPasswordCodeToUserEmail(userId);
+        } else if (email != null && !email.isBlank()) {
+            userService.sendPasswordCodeToEmail(email.trim());
+        } else {
+            return Result.error(400, "BAD_REQUEST", "请提供 userId 或 email");
+        }
+        return Result.success();
+    }
+
+    /** 凭验证码修改密码：登录后传 userId；未登录传 email */
+    @PutMapping("/changePasswordByCode")
+    public Result<Void> changePasswordByCode(@RequestParam(value = "userId", required = false) Integer userId,
+                                             @RequestParam(value = "email", required = false) String email,
+                                             @RequestParam("code") String code,
+                                             @RequestParam("newPassword") String newPassword) {
+        userService.changePasswordByCode(userId, email, code, newPassword);
+        return Result.success();
+    }
+
     // 上传头像
     @PostMapping("/uploadAvatar")
     public Result<User> uploadAvatar(@RequestParam("userId") Integer userId,

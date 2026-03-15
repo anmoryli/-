@@ -38,4 +38,9 @@ public class Conversation {
      * 更新时间，默认当前时间，更新时自动刷新
      */
     private LocalDateTime updatedAt;
+
+    /**
+     * 是否有用户未读的 AI 消息（破冰或 AI 回复时置 true，拉取历史或标记已读时置 false）
+     */
+    private Boolean hasUnreadAi;
 }

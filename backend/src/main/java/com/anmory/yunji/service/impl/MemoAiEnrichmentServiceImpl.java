@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Slf4j
 @Service
@@ -60,6 +61,14 @@ public class MemoAiEnrichmentServiceImpl implements MemoAiEnrichmentService {
                 if (category != null && !category.isBlank()) {
                     memoMapper.updateCategory(memoId, category);
                     log.info("AI 分类已更新 memoId={} category={}", memoId, category);
+                }
+            }
+
+            if (memo != null && (memo.getMood() == null || memo.getMood().isBlank())) {
+                String mood = inferMoodFromContent(content);
+                if (mood != null && !mood.isBlank()) {
+                    memoMapper.updateMood(memoId, mood);
+                    log.info("AI 情绪已更新 memoId={} mood={}", memoId, mood);
                 }
             }
         } catch (Exception e) {
@@ -121,5 +130,23 @@ public class MemoAiEnrichmentServiceImpl implements MemoAiEnrichmentService {
             if (t.contains(phrase)) return DEFAULT_CATEGORY;
         }
         return t;
+    }
+
+    private static final Set<String> VALID_MOODS = Set.of("happy", "calm", "tired", "anxious", "peaceful");
+
+    /** 根据记录内容推断心情枚举，写回 memo.mood */
+    private String inferMoodFromContent(String content) {
+        if (content == null || content.isBlank()) return null;
+        try {
+            String promptStr = promptService.getUserPrompt("memo_emotion_from_content", "default", Map.of("content", content.length() > 500 ? content.substring(0, 500) : content));
+            if (promptStr == null || promptStr.isBlank()) return null;
+            String result = chatClient.prompt().user(promptStr).call().content();
+            if (result == null) return null;
+            String trimmed = result.trim().toLowerCase().replaceAll("[^a-z]", "");
+            return VALID_MOODS.contains(trimmed) ? trimmed : null;
+        } catch (Exception e) {
+            log.warn("AI 情绪识别失败", e);
+            return null;
+        }
     }
 }

@@ -113,7 +113,7 @@ public class MentionMailServiceImpl implements MentionMailService {
                     n.setUserId(recordOwnerId);
                     n.setType("system");
                     n.setTitle(inviteSpouseTitle);
-                    n.setBody("在「家人共享」中邀请配偶加入，对方即可在 App 内收到你的新记录提醒。");
+                    n.setBody("在「我们的小家」中邀请配偶加入，对方即可在 App 内收到你的新记录提醒。");
                     n.setRelatedTaskId(null);
                     userNotificationMapper.insert(n);
                     log.info("[新记录通知] 无配偶，已向孕妇发站内提醒（仅提醒一次） recordOwnerId={}", recordOwnerId);

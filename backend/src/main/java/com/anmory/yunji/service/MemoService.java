@@ -65,4 +65,9 @@ public interface MemoService {
     List<Memo> getAllMemoByUserId(Integer userId);
 
     List<Memo> getAllMemoByUserIdPaged(Integer userId, Integer requestUserId, int limit, int offset);
+
+    /**
+     * 按 memoId 查询单条记录，仅当 requestUserId 有权限查看时返回，否则返回 null。
+     */
+    Memo getMemoByIdIfVisible(Integer memoId, Integer requestUserId);
 }
