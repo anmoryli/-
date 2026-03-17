@@ -174,7 +174,7 @@ export function MarkdownView({
               <button
                 type="button"
                 onClick={() => setPreviewUrl(null)}
-                className="flex items-center gap-2 rounded-xl border border-[var(--card-border)] bg-[var(--card)] px-4 py-2 text-sm"
+                className="flex items-center gap-2 rounded-xl border border-[var(--card-border)] bg-[var(--card-solid)] px-4 py-2 text-sm"
               >
                 <X className="h-4 w-4" /> 关闭
               </button>

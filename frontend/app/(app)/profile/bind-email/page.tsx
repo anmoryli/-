@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useBack } from "@/lib/use-back"
 import { ArrowLeft, Mail } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import { bindEmail } from "@/lib/api/user"
@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
 
 export default function BindEmailPage() {
-  const router = useRouter()
+  const goBack = useBack("/profile/settings")
   const { user, setUser } = useAuth()
   const [email, setEmail] = useState("")
   const [loading, setLoading] = useState(false)
@@ -38,7 +38,7 @@ export default function BindEmailPage() {
       toast.success(user.email ? "邮箱已更换" : "邮箱已绑定")
       setShowChange(false)
       setEmail("")
-      if (!user.email) router.back()
+      if (!user.email) goBack()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "绑定失败")
     } finally {
@@ -48,17 +48,17 @@ export default function BindEmailPage() {
 
   if (user.email && !showChange) {
     return (
-      <div className="min-h-dvh bg-[var(--background)] px-4 pb-8">
-        <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-[var(--card-border)] bg-[var(--background)]/95 px-4 py-4 backdrop-blur-sm">
+      <div className="min-h-dvh px-4 pb-8">
+        <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-white/40 px-4 py-4" style={{ background: "rgba(255,255,255,0.45)", backdropFilter: "blur(24px) saturate(1.3)", WebkitBackdropFilter: "blur(24px) saturate(1.3)" }}>
           <button
-            onClick={() => router.back()}
+            onClick={goBack}
             className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--muted)] transition-colors active:bg-[var(--muted)]/80"
           >
             <ArrowLeft className="h-5 w-5" strokeWidth={1.75} />
           </button>
           <h1 className="text-lg font-semibold text-[var(--foreground)]">邮箱与安全</h1>
         </div>
-        <div className="mt-6 rounded-2xl border border-[var(--card-border)] bg-[var(--card)] p-6">
+        <div className="mt-6 glass-card p-6">
           <div className="flex items-center gap-3">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--accent-1-muted)] text-[var(--accent-1)]">
               <Mail className="h-6 w-6" strokeWidth={1.75} />
@@ -86,8 +86,8 @@ export default function BindEmailPage() {
 
   if (user.email && showChange) {
     return (
-      <div className="min-h-dvh bg-[var(--background)] px-4 pb-8">
-        <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-[var(--card-border)] bg-[var(--background)]/95 px-4 py-4 backdrop-blur-sm">
+      <div className="min-h-dvh px-4 pb-8">
+        <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-white/40 px-4 py-4" style={{ background: "rgba(255,255,255,0.45)", backdropFilter: "blur(24px) saturate(1.3)", WebkitBackdropFilter: "blur(24px) saturate(1.3)" }}>
           <button
             onClick={() => setShowChange(false)}
             className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--muted)] transition-colors active:bg-[var(--muted)]/80"
@@ -96,7 +96,7 @@ export default function BindEmailPage() {
           </button>
           <h1 className="text-lg font-semibold text-[var(--foreground)]">更换邮箱</h1>
         </div>
-        <div className="mt-6 rounded-2xl border border-[var(--card-border)] bg-[var(--card)] p-6">
+        <div className="mt-6 glass-card p-6">
           <p className="text-sm text-[var(--foreground-muted)]">当前邮箱：{user.email}</p>
           <form onSubmit={handleBind} className="mt-6 space-y-4">
             <div>
@@ -125,17 +125,17 @@ export default function BindEmailPage() {
   }
 
   return (
-    <div className="min-h-dvh bg-[var(--background)] px-4 pb-8">
-      <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-[var(--card-border)] bg-[var(--background)]/95 px-4 py-4 backdrop-blur-sm">
+    <div className="min-h-dvh px-4 pb-8">
+      <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-white/40 px-4 py-4" style={{ background: "rgba(255,255,255,0.45)", backdropFilter: "blur(24px) saturate(1.3)", WebkitBackdropFilter: "blur(24px) saturate(1.3)" }}>
         <button
-          onClick={() => router.back()}
+          onClick={goBack}
           className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--muted)] transition-colors active:bg-[var(--muted)]/80"
         >
           <ArrowLeft className="h-5 w-5" strokeWidth={1.75} />
         </button>
         <h1 className="text-lg font-semibold text-[var(--foreground)]">邮箱与安全</h1>
       </div>
-      <div className="mt-6 rounded-2xl border border-[var(--card-border)] bg-[var(--card)] p-6">
+      <div className="mt-6 glass-card p-6">
         <p className="text-sm text-[var(--foreground-muted)]">
           绑定后可通过「忘记密码」在登录页重置密码
         </p>

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useBack } from "@/lib/use-back"
 import { ArrowLeft, Bell } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import { getNotificationList, markNotificationRead, markAllNotificationsRead, type UserNotification } from "@/lib/api/notifications"
@@ -9,7 +9,7 @@ import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 
 export default function NotificationsPage() {
-  const router = useRouter()
+  const goBack = useBack("/")
   const { user } = useAuth()
   const [list, setList] = useState<UserNotification[]>([])
   const [loading, setLoading] = useState(true)
@@ -49,11 +49,11 @@ export default function NotificationsPage() {
   }
 
   return (
-    <div className="min-h-dvh bg-[var(--background)] pb-8">
-      <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-[var(--card-border)] bg-[var(--background)]/95 px-4 py-4 backdrop-blur-sm">
+    <div className="min-h-dvh pb-8">
+      <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-white/40 px-4 py-4" style={{ background: "rgba(255,255,255,0.45)", backdropFilter: "blur(24px) saturate(1.3)", WebkitBackdropFilter: "blur(24px) saturate(1.3)" }}>
         <div className="flex items-center gap-3">
           <button
-            onClick={() => router.back()}
+            onClick={() => goBack()}
             className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--muted)] transition-colors active:bg-[var(--muted)]/80"
           >
             <ArrowLeft className="h-5 w-5" strokeWidth={1.75} />
@@ -86,11 +86,11 @@ export default function NotificationsPage() {
 
       <div className="px-4 pt-6">
         {loading ? (
-          <div className="rounded-2xl bg-[var(--card)] p-6 text-center text-sm text-[var(--foreground-muted)]">
+          <div className="glass-card p-6 text-center text-sm text-[var(--foreground-muted)]">
             加载中...
           </div>
         ) : list.length === 0 ? (
-          <div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card)] p-8 text-center text-sm text-[var(--foreground-muted)]">
+          <div className="glass-card p-8 text-center text-sm text-[var(--foreground-muted)]">
             <Bell className="mx-auto h-10 w-10 opacity-50" strokeWidth={1.5} />
             <p className="mt-2">暂无消息</p>
             <p className="mt-1 text-micro">任务分配等会在这里通知你</p>
@@ -100,7 +100,7 @@ export default function NotificationsPage() {
             {list.map((n) => (
               <li
                 key={n.id}
-                className={`rounded-2xl border border-[var(--card-border)] bg-[var(--card)] p-4 ${n.readAt ? "opacity-75" : ""}`}
+                className={`glass-card p-4 ${n.readAt ? "opacity-75" : ""}`}
               >
                 <button
                   type="button"

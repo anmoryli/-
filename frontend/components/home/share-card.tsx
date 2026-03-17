@@ -139,7 +139,7 @@ export function ShareCard({ username, lastMenstrualDate, dueDate }: ShareCardPro
       <button
         type="button"
         onClick={handleShare}
-        className="flex w-full items-center justify-center gap-2 rounded-xl border border-[var(--accent-1)]/40 bg-[var(--accent-1-muted)] px-4 py-3 text-[14px] font-medium text-[var(--accent-1)] transition-colors active:opacity-90"
+        className="glass-card flex w-full items-center justify-center gap-2 px-4 py-3 text-[14px] font-medium text-[var(--accent-1)] transition-colors active:opacity-90"
       >
         <Share2 className="h-4 w-4" strokeWidth={1.75} />
         生成分享卡片

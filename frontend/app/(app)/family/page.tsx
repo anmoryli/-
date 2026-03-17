@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
+import { useBack } from "@/lib/use-back"
 import { ArrowLeft, Users, Copy, UserPlus, LogOut, Trash2, Pencil } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import {
@@ -78,7 +79,7 @@ function RelationshipEditDialog({
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="border-[var(--card-border)] bg-[var(--card)] sm:max-w-md">
+      <DialogContent className="border-[var(--card-border)] bg-[var(--card-solid)] sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="text-[var(--foreground)]">编辑关系</DialogTitle>
         </DialogHeader>
@@ -245,10 +246,10 @@ export default function FamilyPage() {
   if (!user) return null
 
   return (
-    <div className="min-h-dvh bg-[var(--background)] pb-8">
-      <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-[var(--card-border)] bg-[var(--background)]/95 px-4 py-4 backdrop-blur-sm">
+    <div className="min-h-dvh pb-8">
+      <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-white/40 px-4 py-4" style={{ background: "rgba(255,255,255,0.45)", backdropFilter: "blur(24px) saturate(1.3)", WebkitBackdropFilter: "blur(24px) saturate(1.3)" }}>
         <button
-          onClick={() => router.back()}
+          onClick={() => goBack()}
           className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--muted)] transition-colors active:bg-[var(--muted)]/80"
         >
           <ArrowLeft className="h-5 w-5" strokeWidth={1.75} />
@@ -258,11 +259,11 @@ export default function FamilyPage() {
 
       <div className="space-y-6 px-4 pt-6">
         {loading ? (
-          <div className="rounded-2xl bg-[var(--card)] p-8 text-center text-[var(--foreground-muted)]">
+          <div className="rounded-2xl bg-[var(--card-solid)] p-8 text-center text-[var(--foreground-muted)]">
             加载中...
           </div>
         ) : !family ? (
-          <div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card)] p-8 text-center">
+          <div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-solid)] p-8 text-center">
             <Users className="mx-auto h-14 w-14 text-[var(--accent-1)]" strokeWidth={1.5} />
             <p className="mt-4 text-[15px] font-medium text-[var(--foreground)]">
               创建家庭，邀请家人一起见证孕期时光
@@ -287,7 +288,7 @@ export default function FamilyPage() {
           </div>
         ) : (
           <>
-            <div className="overflow-hidden rounded-2xl border border-[var(--card-border)] bg-[var(--card)] p-5">
+            <div className="overflow-hidden rounded-2xl border border-[var(--card-border)] bg-[var(--card-solid)] p-5">
               <h2 className="flex items-center gap-2 text-[15px] font-semibold text-[var(--foreground)]">
                 <Copy className="h-4 w-4" strokeWidth={1.75} />
                 邀请码
@@ -327,7 +328,7 @@ export default function FamilyPage() {
               </p>
             )}
 
-            <div className="overflow-hidden rounded-2xl border border-[var(--card-border)] bg-[var(--card)]">
+            <div className="overflow-hidden rounded-2xl border border-[var(--card-border)] bg-[var(--card-solid)]">
               <div className="flex items-center gap-3 border-b border-[var(--card-border)] px-4 py-4">
                 <Users className="h-5 w-5 text-[var(--accent-1)]" strokeWidth={1.75} />
                 <h2 className="text-[15px] font-semibold text-[var(--foreground)]">家庭成员</h2>

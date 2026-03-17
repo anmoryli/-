@@ -71,6 +71,16 @@ public class User {
     private Boolean dataCollectionEnabled;
 
     /**
+     * 是否启用社区功能，默认 false（隐私设置开关）
+     */
+    private Boolean communityEnabled;
+
+    /**
+     * 是否接收邮箱消息，默认 true（通用设置开关）
+     */
+    private Boolean emailEnabled;
+
+    /**
      * 注册时选择的默认关系（家庭成员时：配偶、婆婆、妈妈、爸爸等），加入家庭时自动沿用
      */
     private String defaultRelationship;

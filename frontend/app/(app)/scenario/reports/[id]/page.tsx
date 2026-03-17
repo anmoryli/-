@@ -35,7 +35,7 @@ export default function ScenarioReportDetailPage() {
   if (user.isSpouse !== true) return null
 
   return (
-    <div className="flex min-h-dvh flex-col bg-[var(--background)]">
+    <div className="flex min-h-dvh flex-col">
       <div className="border-b border-[var(--card-border)] bg-[var(--card)] px-6 pt-14 pb-4">
         <div className="flex items-center gap-3">
           <Link
@@ -71,7 +71,7 @@ export default function ScenarioReportDetailPage() {
             报告不存在或无权查看
           </div>
         ) : (
-          <div className="card-elevated rounded-xl border border-[var(--card-border)] bg-[var(--card)] p-5">
+          <div className="card-elevated glass-card p-5">
             <div className="prose prose-sm max-w-none text-[var(--foreground)]">
               <MarkdownView content={report.content ?? ""} className="min-h-[1em]" />
             </div>

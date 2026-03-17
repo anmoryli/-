@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import { useBack } from "@/lib/use-back"
 import { ArrowLeft, CheckCircle2, ChevronDown, ChevronUp, Circle, ListTodo, Plus, Sparkles } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import { getMyTasks, getFamilyTasks, completeTask, createTask, suggestTasks, type FamilyTaskItem } from "@/lib/api/family-tasks"
@@ -21,6 +22,7 @@ import {
 
 export default function TasksPage() {
   const router = useRouter()
+  const goBack = useBack("/")
   const { user } = useAuth()
   const [tasks, setTasks] = useState<FamilyTaskItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -90,10 +92,10 @@ export default function TasksPage() {
   const completedList = tasks.filter((t) => t.status === "completed")
 
   return (
-    <div className="min-h-dvh bg-[var(--background)] pb-8">
-      <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-[var(--card-border)] bg-[var(--background)]/95 px-4 py-4 backdrop-blur-sm">
+    <div className="min-h-dvh pb-8">
+      <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-white/40 px-4 py-4" style={{ background: "rgba(255,255,255,0.45)", backdropFilter: "blur(24px) saturate(1.3)", WebkitBackdropFilter: "blur(24px) saturate(1.3)" }}>
         <button
-          onClick={() => router.back()}
+          onClick={() => goBack()}
           className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--muted)] transition-colors active:bg-[var(--muted)]/80"
         >
           <ArrowLeft className="h-5 w-5" strokeWidth={1.75} />
@@ -151,11 +153,11 @@ export default function TasksPage() {
           </div>
         )}
         {loading ? (
-          <div className="rounded-2xl bg-[var(--card)] p-6 text-center text-sm text-[var(--foreground-muted)]">
+          <div className="glass-card p-6 text-center text-sm text-[var(--foreground-muted)]">
             加载中...
           </div>
         ) : pendingList.length === 0 && completedList.length === 0 ? (
-          <div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card)] p-6 text-center text-sm text-[var(--foreground-muted)]">
+          <div className="glass-card p-6 text-center text-sm text-[var(--foreground-muted)]">
             {isCreator ? "暂无分配的任务。添加后将显示在这里。" : "暂无任务。孕妇可在「我们的小家」中为配偶生成本周小任务。"}
           </div>
         ) : (
@@ -173,7 +175,7 @@ export default function TasksPage() {
                     return (
                       <div
                         key={t.id}
-                        className="rounded-2xl border border-[var(--card-border)] bg-[var(--card)] overflow-hidden"
+                        className="glass-card overflow-hidden"
                       >
                         <div className="flex items-start gap-3 p-4">
                           {t.assigneeUserId === user.userId ? (
@@ -229,7 +231,7 @@ export default function TasksPage() {
                   {completedList.map((t) => (
                     <div
                       key={t.id}
-                      className="flex items-center gap-3 rounded-2xl border border-[var(--card-border)] bg-[var(--card)] p-4 opacity-80"
+                      className="flex items-center gap-3 glass-card p-4 opacity-80"
                     >
                       <CheckCircle2 className="h-5 w-5 shrink-0 text-[var(--accent-1)]" strokeWidth={1.75} />
                       <div className="min-w-0 flex-1">
@@ -250,7 +252,7 @@ export default function TasksPage() {
 
         {/* 自定义任务弹窗 */}
         <Dialog open={customOpen} onOpenChange={setCustomOpen}>
-          <DialogContent className="border-[var(--card-border)] bg-[var(--card)] max-w-sm">
+          <DialogContent className="border-[var(--card-border)] bg-[var(--card-solid)] max-w-sm">
             <DialogHeader>
               <DialogTitle>自定义任务</DialogTitle>
             </DialogHeader>
@@ -314,7 +316,7 @@ export default function TasksPage() {
 
         {/* AI 建议任务弹窗 */}
         <Dialog open={suggestOpen} onOpenChange={setSuggestOpen}>
-          <DialogContent className="border-[var(--card-border)] bg-[var(--card)] max-w-sm max-h-[80vh] flex flex-col">
+          <DialogContent className="border-[var(--card-border)] bg-[var(--card-solid)] max-w-sm max-h-[80vh] flex flex-col">
             <DialogHeader>
               <DialogTitle>AI 生成本周任务建议</DialogTitle>
             </DialogHeader>
@@ -328,7 +330,7 @@ export default function TasksPage() {
                   {suggestList.map((item, i) => (
                     <label
                       key={i}
-                      className="flex cursor-pointer items-start gap-3 rounded-2xl border border-[var(--card-border)] bg-[var(--card)] p-4 transition-colors hover:bg-[var(--muted)]/30"
+                      className="flex cursor-pointer items-start gap-3 glass-card p-4 transition-colors hover:bg-[var(--muted)]/30"
                     >
                       <span className="mt-0.5 shrink-0">
                         <input

@@ -1,19 +1,10 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { getMoodHistory } from "@/lib/api/daily"
+import { getMoodRecordHistory } from "@/lib/api/mood"
+import { MOOD_LABELS } from "@/lib/mood-labels"
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, Cell } from "recharts"
-import { format } from "date-fns"
-import { zhCN } from "date-fns/locale"
 import { Smile } from "lucide-react"
-
-const MOOD_LABELS: Record<string, string> = {
-  happy: "开心",
-  calm: "平静",
-  tired: "疲惫",
-  anxious: "焦虑",
-  peaceful: "安心",
-}
 
 const MOOD_COLORS = [
   "var(--accent-1)",
@@ -33,11 +24,11 @@ export function MoodChart({ userId, days = 7 }: MoodChartProps) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    getMoodHistory(userId, days)
+    getMoodRecordHistory(userId, days)
       .then((list) => {
         const moodCount: Record<string, number> = {}
-        for (const d of list || []) {
-          const m = (d as { mood?: string | null }).mood
+        for (const r of list || []) {
+          const m = (r as { mood?: string }).mood
           if (m && m.trim()) {
             moodCount[m] = (moodCount[m] || 0) + 1
           }
@@ -56,7 +47,7 @@ export function MoodChart({ userId, days = 7 }: MoodChartProps) {
   if (loading || data.length === 0) return null
 
   return (
-    <div className="card-elevated overflow-hidden rounded-xl p-4">
+    <div className="glass-card overflow-hidden rounded-xl p-4">
       <div className="mb-3 flex items-center gap-2">
         <Smile className="h-4 w-4 text-[var(--accent-1)]" strokeWidth={1.75} />
         <p className="text-micro font-medium uppercase tracking-wider text-[var(--foreground-muted)]">
@@ -80,9 +71,9 @@ export function MoodChart({ userId, days = 7 }: MoodChartProps) {
                 const p = payload?.[0]?.payload
                 if (!p) return null
                 return (
-                  <div className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] px-3 py-2 text-xs shadow-lg">
-                    <p className="font-medium">{p.label}</p>
-                    <p className="mt-0.5 text-[var(--foreground-muted)]">{p.count} 天</p>
+                  <div className="rounded-lg border border-[var(--card-border)] bg-[var(--card-solid)] px-3 py-2 text-xs shadow-lg">
+                    <p className="font-medium text-[var(--foreground)]">{p.label}</p>
+                    <p className="mt-0.5 text-[var(--foreground-muted)]">{p.count} 次</p>
                   </div>
                 )
               }}

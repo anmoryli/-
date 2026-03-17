@@ -53,7 +53,7 @@ public class ScheduledOperationRunner {
                 userNotificationMapper.insert(n);
 
                 User user = userService.getById(op.getUserId());
-                if (user != null && user.getEmail() != null && !user.getEmail().isBlank()) {
+                if (user != null && user.getEmail() != null && !user.getEmail().isBlank() && !Boolean.FALSE.equals(user.getEmailEnabled())) {
                     String timeDesc = op.getNextRunAt() != null ? op.getNextRunAt().format(FMT) : "当前";
                     String subject = "孕期宝 · 提醒";
                     String body = "您有一条提醒：\n\n" + sendBody + "\n\n时间：" + timeDesc + "\n\n—— 孕期宝";

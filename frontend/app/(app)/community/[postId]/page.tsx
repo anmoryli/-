@@ -157,9 +157,9 @@ export default function CommunityPostDetailPage() {
   const tree = buildCommentTree(comments)
 
   return (
-    <div className="min-h-dvh bg-[var(--background)] pb-32">
-      <div className="sticky top-0 z-20 flex items-center gap-3 border-b border-[var(--card-border)] bg-[var(--background)]/95 px-4 py-3 backdrop-blur-sm">
-        <button onClick={goBack} className="flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--card-border)] bg-[var(--card)]">
+    <div className="min-h-dvh pb-32">
+      <div className="sticky top-0 z-20 flex items-center gap-3 border-b border-white/40 px-4 py-3" style={{ background: "rgba(255,255,255,0.45)", backdropFilter: "blur(24px) saturate(1.3)", WebkitBackdropFilter: "blur(24px) saturate(1.3)" }}>
+        <button onClick={goBack} className="flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--card-border)] bg-[var(--card-solid)]">
           <ArrowLeft className="h-5 w-5" />
         </button>
         <span className="text-sm font-medium">{post.authorName}</span>
@@ -195,7 +195,7 @@ export default function CommunityPostDetailPage() {
                         className="h-24 w-24 shrink-0 overflow-hidden border-0 border-r border-[var(--card-border)] bg-[var(--muted)] last:border-r-0 first:rounded-l-lg last:rounded-r-lg"
                       >
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={url} alt={`参考图${i + 1}`} className="h-full w-full object-cover block" referrerPolicy="no-referrer" />
+                        <img src={url} alt={`参考图${i + 1}`} loading="lazy" className="h-full w-full object-cover block" referrerPolicy="no-referrer" />
                       </button>
                     ))}
                   </div>
@@ -209,7 +209,7 @@ export default function CommunityPostDetailPage() {
                   className="block w-full overflow-hidden rounded-xl border border-[var(--card-border)] bg-[var(--muted)]"
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={post.post.outputImageUrl} alt="效果图" className="h-40 w-full object-cover sm:h-48" referrerPolicy="no-referrer" />
+                  <img src={post.post.outputImageUrl} alt="效果图" loading="lazy" className="h-40 w-full object-cover sm:h-48" referrerPolicy="no-referrer" />
                 </button>
               </div>
             </>
@@ -231,7 +231,7 @@ export default function CommunityPostDetailPage() {
             <button
               type="button"
               onClick={() => setPreviewImageUrl(null)}
-              className="absolute -top-10 right-0 flex items-center gap-1 rounded-lg border border-[var(--card-border)] bg-[var(--card)] px-3 py-1.5 text-sm text-[var(--foreground)]"
+              className="absolute -top-10 right-0 flex items-center gap-1 rounded-lg border border-[var(--card-border)] bg-[var(--card-solid)] px-3 py-1.5 text-sm text-[var(--foreground)]"
             >
               <X className="h-4 w-4" /> 关闭
             </button>
@@ -248,7 +248,7 @@ export default function CommunityPostDetailPage() {
             onChange={(e) => setCommentInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && onAddComment()}
             placeholder={replyTarget ? `回复 @${replyTarget.username}` : "写评论..."}
-            className="h-10 flex-1 rounded-xl border border-[var(--card-border)] bg-[var(--card)] px-3 text-sm"
+            className="h-10 flex-1 rounded-xl border border-[var(--card-border)] bg-[var(--card-solid)] px-3 text-sm"
           />
           {replyTarget && (
             <button onClick={() => setReplyTarget(null)} className="shrink-0 text-xs text-[var(--foreground-muted)]">取消</button>
@@ -279,7 +279,7 @@ export default function CommunityPostDetailPage() {
         </div>
       </div>
 
-      <div className="fixed bottom-20 left-0 right-0 z-30 mx-auto flex max-w-lg items-center justify-between border-t border-[var(--card-border)] bg-[var(--card)]/98 px-4 py-3 backdrop-blur-sm">
+      <div className="fixed bottom-20 left-0 right-0 z-30 mx-auto flex max-w-lg items-center justify-between border-t border-[var(--card-border)] bg-[var(--card-solid)]/98 px-4 py-3 backdrop-blur-sm">
         <div className="flex items-center gap-4">
           <button onClick={onToggleLike} className="flex items-center gap-1 text-sm">
             <Heart className={`h-5 w-5 ${liked ? "fill-current text-[var(--critical)]" : "text-[var(--foreground-muted)]"}`} />
@@ -351,7 +351,7 @@ function CommentNode({
             <input
               value={editingContent}
               onChange={(e) => setEditingContent(e.target.value)}
-              className="h-9 w-full rounded-lg border border-[var(--card-border)] bg-[var(--card)] px-2 text-sm"
+              className="h-9 w-full rounded-lg border border-[var(--card-border)] bg-[var(--card-solid)] px-2 text-sm"
             />
             <div className="flex gap-2">
               <button onClick={onSaveEdit} className="rounded-lg border px-3 py-1 text-xs">保存</button>

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import { useBack } from "@/lib/use-back"
 import Link from "next/link"
 import { ArrowLeft, Users } from "lucide-react"
 import { Input } from "@/components/ui/input"
@@ -21,6 +22,7 @@ const RELATIONSHIP_OPTIONS = [
 
 export default function FamilyJoinPage() {
   const router = useRouter()
+  const goBack = useBack("/family")
   const { user } = useAuth()
   const [inviteCode, setInviteCode] = useState("")
   const [relationship, setRelationship] = useState("")
@@ -54,7 +56,7 @@ export default function FamilyJoinPage() {
     setCustomRelationship(r)
   }, [user])
 
-  const handleBack = () => router.back()
+  const handleBack = () => goBack()
 
   const handleJoin = async () => {
     if (!user || !inviteCode.trim()) {
@@ -89,7 +91,7 @@ export default function FamilyJoinPage() {
   if (!user) return null
 
   return (
-    <div className="min-h-dvh bg-[var(--background)] px-4 pt-14 pb-8">
+    <div className="min-h-dvh px-4 pt-14 pb-8">
       <div className="flex items-center gap-3">
         <button
           onClick={handleBack}
@@ -118,7 +120,7 @@ export default function FamilyJoinPage() {
         <select
           value={relationship}
           onChange={(e) => setRelationship(e.target.value)}
-          className="mt-2 w-full rounded-xl border border-[var(--card-border)] bg-[var(--card)] px-4 py-3 text-[var(--foreground)]"
+          className="mt-2 w-full rounded-xl border border-[var(--card-border)] bg-[var(--card-solid)] px-4 py-3 text-[var(--foreground)]"
         >
           {RELATIONSHIP_OPTIONS.map((opt) => (
             <option key={opt.value || "empty"} value={opt.value}>
@@ -132,7 +134,7 @@ export default function FamilyJoinPage() {
               placeholder="请输入与孕妇的关系（如叔叔、舅舅等）"
               value={customRelationship}
               onChange={(e) => setCustomRelationship(e.target.value)}
-              className="rounded-xl border-[var(--card-border)] bg-[var(--card)] px-4 py-3"
+              className="rounded-xl border-[var(--card-border)] bg-[var(--card-solid)] px-4 py-3"
             />
           </div>
         )}
@@ -144,7 +146,7 @@ export default function FamilyJoinPage() {
           onChange={(e) => setInviteCode(e.target.value.toUpperCase().slice(0, 6))}
           placeholder="ABCD12"
           maxLength={6}
-          className="mt-2 w-full rounded-xl border border-[var(--card-border)] bg-[var(--card)] px-4 py-4 text-center font-mono text-2xl tracking-[0.5em] placeholder:text-[var(--foreground-muted)]"
+          className="mt-2 w-full rounded-xl border border-[var(--card-border)] bg-[var(--card-solid)] px-4 py-4 text-center font-mono text-2xl tracking-[0.5em] placeholder:text-[var(--foreground-muted)]"
         />
         <button
           onClick={handleJoin}

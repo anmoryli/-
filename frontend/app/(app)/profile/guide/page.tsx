@@ -1,6 +1,6 @@
 "use client"
 
-import { useRouter } from "next/navigation"
+import { useBack } from "@/lib/use-back"
 import {
   ArrowLeft,
   Home,
@@ -120,13 +120,13 @@ const sections = [
 ]
 
 export default function GuidePage() {
-  const router = useRouter()
+  const goBack = useBack("/profile")
 
   return (
-    <div className="min-h-dvh bg-background">
-      <div className="sticky top-0 z-10 flex items-center gap-3 bg-background/95 px-4 py-4 backdrop-blur-sm">
+    <div className="min-h-dvh">
+      <div className="sticky top-0 z-10 flex items-center gap-3 px-4 py-4" style={{ background: "rgba(255,255,255,0.45)", backdropFilter: "blur(24px) saturate(1.3)", WebkitBackdropFilter: "blur(24px) saturate(1.3)" }}>
         <button
-          onClick={() => router.back()}
+          onClick={goBack}
           className="flex h-9 w-9 items-center justify-center rounded-full bg-secondary transition-colors active:bg-secondary/80"
         >
           <ArrowLeft className="h-5 w-5" />

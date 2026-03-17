@@ -33,7 +33,7 @@ export function SpouseEmotionCard({ userId }: SpouseEmotionCardProps) {
   const trendLabel = TREND_LABELS[summary.trend] ?? summary.trend
 
   return (
-    <div className="card-elevated overflow-hidden rounded-xl p-4">
+    <div className="glass-card overflow-hidden rounded-xl p-4">
       <div className="mb-3 flex items-center gap-2">
         <Heart className="h-4 w-4 text-[var(--accent-1)]" strokeWidth={1.75} />
         <p className="text-micro font-medium uppercase tracking-wider text-[var(--foreground-muted)]">

@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { useAuth } from "@/lib/auth-context"
+import { mutateRecords } from "@/lib/hooks/use-records"
 import { addText, addPhoto, addVoice, addFile, inspireMemo } from "@/lib/api/memo"
 import { getMyFamily, getFamilyMembers, type FamilyMember } from "@/lib/api/family"
 import { getTodayLog, updateWeight } from "@/lib/api/daily"
@@ -320,6 +321,7 @@ export default function NewRecordPage() {
           break
       }
 
+      mutateRecords(user?.userId, user?.userType)
       setShowSuccessAnim(true)
       setTimeout(() => {
         toast.success("记录已保存")
@@ -545,7 +547,7 @@ export default function NewRecordPage() {
       {/* 可见范围弹窗 */}
       {showVisibleModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowVisibleModal(false)}>
-          <div className="mx-4 max-h-[70vh] w-full max-w-sm overflow-auto rounded-xl border border-[var(--card-border)] bg-[var(--card)] p-4 shadow-lg" onClick={(e) => e.stopPropagation()}>
+          <div className="mx-4 max-h-[70vh] w-full max-w-sm overflow-auto glass-card p-4 shadow-lg" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-body font-semibold">{visibilityMode === "blocklist" ? "选择不可见成员" : "选择可见成员"}</h3>
             <p className="mt-1 text-micro text-[var(--foreground-muted)]">
               {visibilityMode === "blocklist"

@@ -57,9 +57,15 @@ export async function register(
   }
 }
 
-/** 更新用户角色（孕妇/家庭成员） */
-export async function updateUserType(userId: number, userType: "pregnant" | "family_member") {
-  return apiPut<User>("/api/user/updateUserType", { userId, userType })
+/** 更新用户角色（孕妇/家庭成员），可选传 defaultRelationship 以同步更新关系 */
+export async function updateUserType(
+  userId: number,
+  userType: "pregnant" | "family_member",
+  defaultRelationship?: string
+) {
+  const params: Record<string, unknown> = { userId, userType }
+  if (defaultRelationship) params.defaultRelationship = defaultRelationship
+  return apiPut<User>("/api/user/updateUserType", params)
 }
 
 /** 修改用户名 */
@@ -197,5 +203,27 @@ export async function getDataCollectionEnabled(userId: number): Promise<boolean>
 /** 更新数据收集偏好（隐私设置） */
 export async function updateDataCollectionEnabled(userId: number, enabled: boolean) {
   return apiPut<unknown>("/api/user/privacy/dataCollection", { userId, enabled: enabled ? "true" : "false" })
+}
+
+/** 获取社区功能开关（隐私设置，默认关闭） */
+export async function getCommunityEnabled(userId: number): Promise<boolean> {
+  const data = await apiGet<boolean>("/api/user/privacy/community", { userId })
+  return data === true
+}
+
+/** 更新社区功能开关（隐私设置） */
+export async function updateCommunityEnabled(userId: number, enabled: boolean) {
+  return apiPut<unknown>("/api/user/privacy/community", { userId, enabled: enabled ? "true" : "false" })
+}
+
+/** 获取邮箱消息开关（通用设置，默认开启） */
+export async function getEmailEnabled(userId: number): Promise<boolean> {
+  const data = await apiGet<boolean>("/api/user/settings/email", { userId })
+  return data === true
+}
+
+/** 更新邮箱消息开关（通用设置） */
+export async function updateEmailEnabled(userId: number, enabled: boolean) {
+  return apiPut<unknown>("/api/user/settings/email", { userId, enabled: enabled ? "true" : "false" })
 }
 

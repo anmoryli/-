@@ -173,11 +173,42 @@ public class UserController {
         return Result.success();
     }
 
-    // 更新用户角色（孕妇/家庭成员）
+    // 隐私设置：社区功能开关（默认关闭）
+    @GetMapping("/privacy/community")
+    public Result<Boolean> getCommunityEnabled(@RequestParam("userId") Integer userId) {
+        User user = userService.getById(userId);
+        if (user == null) return Result.error(404, "NOT_FOUND", "用户不存在");
+        return Result.success(Boolean.TRUE.equals(user.getCommunityEnabled()));
+    }
+
+    @PutMapping("/privacy/community")
+    public Result<Void> updateCommunityEnabled(@RequestParam("userId") Integer userId,
+                                               @RequestParam("enabled") Boolean enabled) {
+        userService.updateCommunityEnabled(userId, enabled != null && enabled);
+        return Result.success();
+    }
+
+    // 通用设置：邮箱消息开关（关闭后任何邮件都不发送）
+    @GetMapping("/settings/email")
+    public Result<Boolean> getEmailEnabled(@RequestParam("userId") Integer userId) {
+        User user = userService.getById(userId);
+        if (user == null) return Result.error(404, "NOT_FOUND", "用户不存在");
+        return Result.success(!Boolean.FALSE.equals(user.getEmailEnabled()));
+    }
+
+    @PutMapping("/settings/email")
+    public Result<Void> updateEmailEnabled(@RequestParam("userId") Integer userId,
+                                           @RequestParam("enabled") Boolean enabled) {
+        userService.updateEmailEnabled(userId, enabled != null && enabled);
+        return Result.success();
+    }
+
+    // 更新用户角色（孕妇/家庭成员），可选传 defaultRelationship 以同步更新关系
     @PutMapping("/updateUserType")
     public Result<User> updateUserType(@RequestParam("userId") Integer userId,
-                                       @RequestParam("userType") String userType) {
-        User user = userService.updateUserType(userId, userType);
+                                       @RequestParam("userType") String userType,
+                                       @RequestParam(value = "defaultRelationship", required = false) String defaultRelationship) {
+        User user = userService.updateUserType(userId, userType, defaultRelationship);
         enrichWithIsSpouse(user);
         return Result.success(user);
     }

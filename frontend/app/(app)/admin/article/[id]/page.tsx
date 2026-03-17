@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter, useParams } from "next/navigation"
+import { useBack } from "@/lib/use-back"
 import { ArrowLeft } from "lucide-react"
 import { getAdminArticle, updateArticle, type AdminArticle } from "@/lib/api/admin"
 import { Button } from "@/components/ui/button"
@@ -12,6 +13,7 @@ import { toast } from "sonner"
 
 export default function AdminArticleEditPage() {
   const router = useRouter()
+  const goBack = useBack("/admin")
   const params = useParams()
   const id = params?.id as string
   const articleId = id ? parseInt(id, 10) : NaN
@@ -78,26 +80,26 @@ export default function AdminArticleEditPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-dvh items-center justify-center bg-[var(--background)]">
+      <div className="flex min-h-dvh items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--accent-1)]/30 border-t-[var(--accent-1)]" />
       </div>
     )
   }
   if (!article) {
     return (
-      <div className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-[var(--background)] px-4">
+      <div className="flex min-h-dvh flex-col items-center justify-center gap-4 px-4">
         <p className="text-[var(--foreground-muted)]">文章不存在</p>
-        <Button variant="outline" onClick={() => router.back()}>返回</Button>
+        <Button variant="outline" onClick={() => goBack()}>返回</Button>
       </div>
     )
   }
 
   return (
-    <div className="flex min-h-dvh flex-col bg-[var(--background)]">
-      <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-[var(--card-border)] bg-[var(--background)] px-4 py-4">
+    <div className="flex min-h-dvh flex-col">
+      <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-white/40 px-4 py-4" style={{ background: "rgba(255,255,255,0.45)", backdropFilter: "blur(24px) saturate(1.3)", WebkitBackdropFilter: "blur(24px) saturate(1.3)" }}>
         <button
           type="button"
-          onClick={() => router.back()}
+          onClick={() => goBack()}
           className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--muted)]"
         >
           <ArrowLeft className="h-5 w-5" />
@@ -185,7 +187,7 @@ export default function AdminArticleEditPage() {
           />
         </div>
         <div className="mt-6 flex gap-3">
-          <Button type="button" variant="outline" onClick={() => router.back()}>
+          <Button type="button" variant="outline" onClick={() => goBack()}>
             取消
           </Button>
           <Button type="submit" disabled={saving}>

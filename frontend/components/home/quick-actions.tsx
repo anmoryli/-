@@ -72,7 +72,7 @@ export function QuickActions({ isPregnant = true }: { isPregnant?: boolean }) {
           >
             <div
               className={cn(
-                "flex h-14 w-14 items-center justify-center rounded-full border transition-colors",
+                "flex h-14 w-14 items-center justify-center rounded-2xl border transition-all active:scale-95",
                 action.className
               )}
             >

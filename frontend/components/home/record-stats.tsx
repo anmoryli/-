@@ -32,7 +32,7 @@ export function RecordStats({ records }: RecordStatsProps) {
   ]
 
   return (
-    <div className="card-elevated overflow-hidden rounded-xl p-4">
+    <div className="glass-card overflow-hidden rounded-xl p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <p className="text-micro font-medium uppercase tracking-wider text-[var(--foreground-muted)]">
           记录回顾

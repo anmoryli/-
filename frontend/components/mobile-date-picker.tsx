@@ -136,7 +136,7 @@ export function MobileDatePicker({
       </div>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-[min(100vw-2rem,380px)] overflow-hidden rounded-2xl border-[var(--card-border)] bg-[var(--card)] p-0 shadow-xl">
+        <DialogContent className="max-w-[min(100vw-2rem,380px)] overflow-hidden rounded-2xl border-[var(--card-border)] bg-[var(--card-solid)] p-0 shadow-xl">
           <DialogHeader className="border-b border-[var(--card-border)] px-4 py-3">
             <DialogTitle className="text-[var(--foreground)]">
               {label || "选择日期"}

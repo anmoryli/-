@@ -59,7 +59,7 @@ function getRecordContent(record: MemoItem): string {
 export function RecentRecords({ records, loading }: RecentRecordsProps) {
   if (loading) {
     return (
-      <div className="card-elevated overflow-hidden rounded-xl">
+      <div className="glass-card overflow-hidden rounded-xl">
         {[1, 2, 3].map((i) => (
           <div
             key={i}
@@ -74,7 +74,7 @@ export function RecentRecords({ records, loading }: RecentRecordsProps) {
 
   if (recentRecords.length === 0) {
     return (
-      <div className="card-elevated rounded-xl p-8 text-center">
+      <div className="glass-card rounded-xl p-8 text-center">
         <p className="text-caption text-[var(--foreground-secondary)]">
           还没有记录，去写第一篇吧
         </p>
@@ -83,7 +83,7 @@ export function RecentRecords({ records, loading }: RecentRecordsProps) {
   }
 
   return (
-    <div className="card-elevated overflow-hidden rounded-xl">
+    <div className="glass-card overflow-hidden rounded-xl">
       {recentRecords.map((record, idx) => (
         <Link
           key={record.id || idx}

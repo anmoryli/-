@@ -93,7 +93,7 @@ export function ContractionTimer({ userId, lastMenstrualDate, dueDate }: Contrac
   }
 
   return (
-    <div className="card-elevated overflow-hidden rounded-xl p-4">
+    <div className="glass-card overflow-hidden rounded-xl p-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Timer className="h-4 w-4 text-[var(--accent-2)]" strokeWidth={1.5} />

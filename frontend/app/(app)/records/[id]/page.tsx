@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react"
 import { useBack } from "@/lib/use-back"
 import Link from "next/link"
-import { useParams, useRouter } from "next/navigation"
+import { useParams } from "next/navigation"
 import { format } from "date-fns"
 import { zhCN } from "date-fns/locale"
 import { ArrowLeft, Image, Mic, FileText, Download, Pencil, Users, Sparkles } from "lucide-react"
@@ -65,7 +65,6 @@ function getPreviewProxyUrl(fileUrl: string): string {
 
 export default function RecordDetailPage() {
   const params = useParams()
-  const router = useRouter()
   const { user } = useAuth()
   const goBack = useBack("/records")
   const id = params.id as string
@@ -282,7 +281,7 @@ export default function RecordDetailPage() {
             {record.fileUrl ? (
               <>
                 {isPdf(record.fileUrl) ? (
-                  <div className="overflow-hidden rounded-xl border border-[var(--card-border)] bg-[var(--card)]">
+                  <div className="glass-card overflow-hidden">
                     <iframe
                       src={getPreviewProxyUrl(record.fileUrl) + "#toolbar=0"}
                       title={title}
@@ -290,7 +289,7 @@ export default function RecordDetailPage() {
                     />
                   </div>
                 ) : isImageUrl(record.fileUrl) ? (
-                  <div className="overflow-hidden rounded-xl border border-[var(--card-border)] bg-[var(--card)]">
+                  <div className="glass-card overflow-hidden">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={getPreviewProxyUrl(record.fileUrl)}
@@ -299,7 +298,7 @@ export default function RecordDetailPage() {
                     />
                   </div>
                 ) : isVideoUrl(record.fileUrl) ? (
-                  <div className="overflow-hidden rounded-xl border border-[var(--card-border)] bg-[var(--card)]">
+                  <div className="glass-card overflow-hidden">
                     <video
                       src={getPreviewProxyUrl(record.fileUrl)}
                       controls
@@ -310,13 +309,13 @@ export default function RecordDetailPage() {
                     </video>
                   </div>
                 ) : isAudioUrl(record.fileUrl) ? (
-                  <div className="overflow-hidden rounded-xl border border-[var(--card-border)] bg-[var(--card)] p-4">
+                  <div className="glass-card overflow-hidden p-4">
                     <audio src={getPreviewProxyUrl(record.fileUrl)} controls className="w-full" preload="metadata">
                       您的浏览器不支持音频播放
                     </audio>
                   </div>
                 ) : isOfficeFile(record.fileUrl) ? (
-                  <div className="overflow-hidden rounded-xl border border-[var(--card-border)] bg-[var(--card)]">
+                  <div className="glass-card overflow-hidden">
                     <iframe
                       src={getOfficeViewerUrl(getPreviewProxyUrl(record.fileUrl))}
                       title={title}
@@ -324,7 +323,7 @@ export default function RecordDetailPage() {
                     />
                   </div>
                 ) : (
-                  <div className="rounded-xl border border-[var(--card-border)] bg-[var(--card)] p-6">
+                  <div className="glass-card p-6">
                     <p className="text-caption text-[var(--foreground-muted)] mb-4">该文件类型暂不支持页面内预览，可在新标签页打开或下载后查看。</p>
                     <div className="flex flex-wrap gap-3">
                       <a
@@ -374,7 +373,7 @@ export default function RecordDetailPage() {
 
         {/* AI 美化弹窗 */}
         <Dialog open={beautifyOpen} onOpenChange={setBeautifyOpen}>
-          <DialogContent className="border-[var(--card-border)] bg-[var(--card)] max-h-[85vh] overflow-hidden flex flex-col max-w-lg">
+          <DialogContent className="border-[var(--card-border)] bg-[var(--card-solid)] max-h-[85vh] overflow-hidden flex flex-col max-w-lg">
             <DialogHeader>
               <DialogTitle className="text-[var(--foreground)]">AI 美化</DialogTitle>
             </DialogHeader>

@@ -1,14 +1,12 @@
 import type { Metadata, Viewport } from 'next'
-import { Noto_Sans_SC, Noto_Serif_SC } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { Toaster } from "@/components/ui/sonner"
 import './globals.css'
 
-const notoSansSC = Noto_Sans_SC({ subsets: ["latin"], weight: ["400", "500", "600"], variable: "--font-sans" })
-const notoSerifSC = Noto_Serif_SC({ subsets: ["latin"], weight: ["400", "600"], variable: "--font-serif" })
+/* 字体由 globals.css 的 --font-sans / --font-serif 定义，避免 next/font 与 Turbopack 的兼容性问题 */
 
 export const viewport: Viewport = {
-  themeColor: '#E3B8B0',
+  themeColor: '#F4A6B8',
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1,
@@ -22,19 +20,19 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       {
-        url: '/icon-light-32x32.png',
+        url: '/icon.png',
         media: '(prefers-color-scheme: light)',
       },
       {
-        url: '/icon-dark-32x32.png',
+        url: '/icon.png',
         media: '(prefers-color-scheme: dark)',
       },
       {
-        url: '/icon.svg',
+        url: '/icon.png',
         type: 'image/svg+xml',
       },
     ],
-    apple: '/apple-icon.png',
+    apple: '/icon.png',
   },
 }
 
@@ -45,7 +43,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="zh-CN" suppressHydrationWarning>
-      <body className={`${notoSansSC.variable} ${notoSerifSC.variable} antialiased`} style={{ fontFamily: 'var(--font-zhongsong)' }} suppressHydrationWarning>
+      <body className="antialiased" suppressHydrationWarning>
         {children}
         <Toaster position="top-center" />
         <Analytics />

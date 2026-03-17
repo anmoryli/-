@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback, memo, type ChangeEvent } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { Bot, Send, MessageSquare, Trash2, ChevronLeft, ImagePlus, X, CheckCircle } from "lucide-react"
+import { Bot, Send, MessageSquare, Trash2, ChevronLeft, ImagePlus, X, CheckCircle, Copy, Check } from "lucide-react"
 import { format } from "date-fns"
 import { zhCN } from "date-fns/locale"
 import { useAuth } from "@/lib/auth-context"
@@ -134,6 +134,18 @@ const MessageBubble = memo(function MessageBubble({
   }
 
   const showTypingCursor = isTyping && isLast && msg.role === "assistant"
+  const [copied, setCopied] = useState(false)
+
+  const handleCopy = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(msg.content)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      toast.error("复制失败")
+    }
+  }, [msg.content])
+
   return (
     <div className="space-y-2 animate-in fade-in slide-in-from-bottom-2 duration-200">
       <div className="max-w-[85%] text-[15px] leading-relaxed text-[var(--foreground)] [&_img]:max-w-[200px] [&_img]:max-h-[200px] [&_img]:object-contain [&_img]:rounded-lg [&_img]:block">
@@ -146,7 +158,26 @@ const MessageBubble = memo(function MessageBubble({
           <span className="inline-block w-2 h-4 ml-0.5 align-middle bg-[var(--foreground)]/70 animate-pulse" aria-hidden />
         )}
         {!isTyping && msg.content && (
-          <PeriodSummaryShare summaryText={msg.content} cardTitle={deriveShareCardTitle(msg.content)} />
+          <div className="mt-2 flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleCopy}
+              className="flex items-center gap-1 rounded-full px-2.5 py-1 text-[12px] text-[var(--foreground-muted)] transition-all hover:bg-[var(--accent-1-muted)] hover:text-[var(--accent-1)] active:scale-95"
+            >
+              {copied ? (
+                <>
+                  <Check className="h-3.5 w-3.5" strokeWidth={2} />
+                  已复制
+                </>
+              ) : (
+                <>
+                  <Copy className="h-3.5 w-3.5" strokeWidth={2} />
+                  复制
+                </>
+              )}
+            </button>
+            <PeriodSummaryShare summaryText={msg.content} cardTitle={deriveShareCardTitle(msg.content)} />
+          </div>
         )}
       </div>
     </div>
@@ -576,9 +607,9 @@ export default function ChatPage() {
   // 历史列表视图 — calm, spacious, journaling-like
   if (view === "list") {
     return (
-      <div className="flex h-dvh flex-col bg-[var(--background)]">
+      <div className="flex h-dvh flex-col">
         {/* Header */}
-        <div className="border-b border-[var(--card-border)] bg-[var(--card)] px-6 pt-14 pb-4">
+        <div className="border-b border-white/40 px-6 pt-14 pb-4" style={{ background: "rgba(255,255,255,0.45)", backdropFilter: "blur(24px) saturate(1.3)", WebkitBackdropFilter: "blur(24px) saturate(1.3)" }}>
           <h1
             className="text-[1.2rem] font-semibold text-[var(--foreground)]"
             style={{ fontFamily: "var(--font-serif)" }}
@@ -589,15 +620,15 @@ export default function ChatPage() {
         </div>
 
         {/* Conversation List */}
-        <div className="flex-1 overflow-y-auto px-6 py-6">
+        <div className="flex-1 overflow-y-auto px-0 py-6">
           {loadingConversations ? (
-            <div className="card-elevated overflow-hidden rounded-xl">
+            <div className="card-elevated overflow-hidden rounded-none">
               {[1, 2, 3].map((i) => (
-                <div key={i} className="h-20 animate-pulse border-b border-[var(--card-border)] bg-[var(--card)] last:border-b-0" />
+                <div key={i} className="h-20 animate-pulse border-b border-white/30 last:border-b-0" style={{ background: "rgba(255,255,255,0.35)" }} />
               ))}
             </div>
           ) : conversations.length === 0 ? (
-            <div className="flex min-h-[50vh] flex-col items-center justify-center text-center">
+            <div className="flex min-h-[50vh] flex-col items-center justify-center px-4 text-center">
               <div className="flex h-14 w-14 items-center justify-center rounded-full border border-[var(--accent-1)]/30 bg-[var(--accent-1-muted)]">
                 <MessageSquare className="h-6 w-6 text-[var(--accent-1)]" strokeWidth={1.75} />
               </div>
@@ -619,11 +650,11 @@ export default function ChatPage() {
             <>
               <button
                 onClick={startNewChat}
-                className="mb-6 w-full rounded-xl border border-[var(--accent-1)]/50 bg-[var(--accent-1-muted)] px-6 py-3.5 text-[14px] font-medium text-[var(--accent-1)] transition-colors active:opacity-90"
+                className="mx-4 mb-6 w-[calc(100%-2rem)] rounded-xl border border-[var(--accent-1)]/50 bg-[var(--accent-1-muted)] px-6 py-3.5 text-[14px] font-medium text-[var(--accent-1)] transition-colors active:opacity-90"
               >
                 + 开始新对话
               </button>
-              <div className="card-elevated overflow-hidden rounded-xl">
+              <div className="card-elevated overflow-hidden rounded-none">
                 {conversations.map((conv, idx) => (
                   <div key={conv.conversationId}>
                     {idx > 0 && <DividerOrnament />}
@@ -655,7 +686,7 @@ export default function ChatPage() {
                     </button>
                     <button
                       onClick={() => setDeleteTarget(conv)}
-                      className="ml-2 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--card-border)] bg-[var(--card)] text-[var(--foreground-muted)] transition-colors hover:bg-[var(--critical-muted)] hover:text-[var(--critical)]"
+                      className="ml-2 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/40 text-[var(--foreground-muted)] transition-colors hover:bg-[var(--critical-muted)] hover:text-[var(--critical)]" style={{ background: "rgba(255,255,255,0.45)" }}
                       aria-label="删除"
                     >
                       <Trash2 className="h-4 w-4" strokeWidth={1.75} />
@@ -694,7 +725,7 @@ export default function ChatPage() {
 
   // 对话视图
   return (
-    <div className="relative flex h-dvh flex-col bg-[var(--background)]">
+    <div className="relative flex h-dvh flex-col">
       {/* 社区发布成功动画 overlay */}
       {showPublishSuccess && (
         <div
@@ -702,8 +733,7 @@ export default function ChatPage() {
           aria-hidden="true"
         >
           <div
-            className="flex flex-col items-center gap-3 rounded-2xl bg-[var(--card)] px-8 py-6 shadow-xl animate-in zoom-in-95 duration-300"
-            style={{ border: "1px solid var(--card-border)" }}
+            className="glass-card flex flex-col items-center gap-3 px-8 py-6 shadow-xl animate-in zoom-in-95 duration-300"
           >
             <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[var(--accent-2)]/20">
               <CheckCircle className="h-8 w-8 text-[var(--accent-2)]" strokeWidth={2} />
@@ -713,11 +743,11 @@ export default function ChatPage() {
         </div>
       )}
       {/* Header — 固定在顶部 */}
-      <div className="sticky top-0 z-20 shrink-0 border-b border-[var(--card-border)] bg-[var(--card)]/98 backdrop-blur-sm px-6 pt-14 pb-4">
+      <div className="sticky top-0 z-20 shrink-0 border-b border-white/40 px-6 pt-14 pb-4" style={{ background: "rgba(255,255,255,0.45)", backdropFilter: "blur(24px) saturate(1.3)", WebkitBackdropFilter: "blur(24px) saturate(1.3)" }}>
         <div className="flex items-center gap-3">
           <button
             onClick={backToList}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[var(--card-border)] bg-[var(--card)] text-[var(--foreground-muted)] transition-colors active:bg-[var(--muted)]"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-white/40 text-[var(--foreground-muted)] transition-colors active:bg-white/20" style={{ background: "rgba(255,255,255,0.5)" }}
             aria-label="返回"
           >
             <ChevronLeft className="h-5 w-5" strokeWidth={1.75} />
@@ -767,7 +797,7 @@ export default function ChatPage() {
                   <button
                     key={q}
                     onClick={() => sendMessage(q)}
-                    className="rounded-xl border border-[var(--card-border)] bg-[var(--card)] px-3 py-2.5 text-left text-[13px] font-medium text-[var(--foreground)] transition-all duration-200 hover:border-[var(--accent-1)]/40 active:bg-[var(--muted)]"
+                    className="glass-card px-3 py-2.5 text-left text-[13px] font-medium text-[var(--foreground)] transition-all duration-200 hover:border-[var(--accent-1)]/40 active:bg-white/60"
                   >
                     {q}
                   </button>
@@ -793,7 +823,7 @@ export default function ChatPage() {
       </div>
 
       {/* Input — 固定在底部、导航栏上方 */}
-      <div className="fixed left-0 right-0 bottom-20 z-30 mx-auto max-w-lg border-t border-[var(--card-border)] bg-[var(--card)]/98 backdrop-blur-sm px-4 py-3 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6 sm:py-4">
+      <div className="fixed left-0 right-0 bottom-20 z-30 mx-auto max-w-lg border-t border-white/40 px-4 py-3 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6 sm:py-4" style={{ background: "rgba(255,255,255,0.5)", backdropFilter: "blur(24px) saturate(1.3)", WebkitBackdropFilter: "blur(24px) saturate(1.3)" }}>
         {isScenarioSession && showScenarioEndSuggest && (
           <div className="mb-3 flex items-center justify-between gap-2 rounded-xl border border-[var(--accent-2)]/40 bg-[var(--accent-2-muted)] px-3 py-2">
             <span className="text-[13px] text-[var(--foreground)]">AI 建议结束情景，是否生成报告？</span>
@@ -801,7 +831,7 @@ export default function ChatPage() {
               <button
                 type="button"
                 onClick={() => setShowScenarioEndSuggest(false)}
-                className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] px-2.5 py-1.5 text-[12px] font-medium text-[var(--foreground-muted)]"
+                className="rounded-lg border border-white/40 px-2.5 py-1.5 text-[12px] font-medium text-[var(--foreground-muted)]" style={{ background: "rgba(255,255,255,0.5)" }}
               >
                 继续对话
               </button>

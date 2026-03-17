@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { useBack } from "@/lib/use-back"
 import { ArrowLeft, Heart, MessageCircle } from "lucide-react"
@@ -18,7 +17,6 @@ import {
 
 export default function MyPostsPage() {
   const { user } = useAuth()
-  const router = useRouter()
   const goBack = useBack("/profile")
   const [posts, setPosts] = useState<CommunityPostWrap[]>([])
   const [loading, setLoading] = useState(true)
@@ -55,7 +53,7 @@ export default function MyPostsPage() {
   const canPublishToCommunity = user.userType === "pregnant" && user.isSpouse !== true
 
   return (
-    <div className="min-h-dvh bg-[var(--background)] px-4 pt-14 pb-8">
+    <div className="min-h-dvh px-4 pt-14 pb-8">
       <div className="flex items-center gap-3">
         <button onClick={goBack} className="flex h-10 w-10 items-center justify-center rounded-lg border border-[var(--card-border)] bg-[var(--card)]">
           <ArrowLeft className="h-5 w-5" />
@@ -83,12 +81,12 @@ export default function MyPostsPage() {
                     {getPostInputImageUrls(item.post).slice(0, 2).map((url, i) => (
                       <div key={i} className="h-10 w-10 shrink-0 overflow-hidden border-r border-[var(--card-border)] last:border-r-0">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={url} alt="" className="h-full w-full object-cover block" referrerPolicy="no-referrer" />
+                        <img src={url} alt="" loading="lazy" className="h-full w-full object-cover block" referrerPolicy="no-referrer" />
                       </div>
                     ))}
                     <div className="h-16 w-16 shrink-0 overflow-hidden">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={item.post.outputImageUrl} alt="" className="h-full w-full object-cover block" referrerPolicy="no-referrer" />
+                      <img src={item.post.outputImageUrl} alt="" loading="lazy" className="h-full w-full object-cover block" referrerPolicy="no-referrer" />
                     </div>
                   </div>
                   <div className="min-w-0 flex-1">

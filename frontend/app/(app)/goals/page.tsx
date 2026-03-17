@@ -1,42 +1,18 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useBack } from "@/lib/use-back"
 import { ArrowLeft, Target, Award, TrendingUp } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
-import { getGoalProgress, getAchievements, type GoalProgress, type UserAchievement } from "@/lib/api/goal"
-import { getHealthValueHistory, getTodayLog } from "@/lib/api/daily"
+import { useGoals } from "@/lib/hooks/use-goals"
 
 export default function GoalsPage() {
-  const router = useRouter()
+  const goBack = useBack("/")
   const { user } = useAuth()
-  const [progress, setProgress] = useState<GoalProgress[]>([])
-  const [achievements, setAchievements] = useState<UserAchievement[]>([])
-  const [healthHistory, setHealthHistory] = useState<Array<{ date: string; healthValue: number }>>([])
-  const [todayHealth, setTodayHealth] = useState<number | null>(null)
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    if (!user) return
-    Promise.all([
-      getGoalProgress(user.userId),
-      getAchievements(user.userId),
-      getHealthValueHistory(user.userId, 14),
-      getTodayLog(user.userId),
-    ])
-      .then(([p, a, h, today]) => {
-        setProgress(p)
-        setAchievements(a)
-        setHealthHistory(h || [])
-        setTodayHealth(today?.healthValue ?? null)
-      })
-      .catch(() => {
-        setProgress([])
-        setAchievements([])
-        setHealthHistory([])
-      })
-      .finally(() => setLoading(false))
-  }, [user])
+  const { data: goalsData, isLoading: loading } = useGoals(user?.userId)
+  const progress = goalsData?.progress ?? []
+  const achievements = goalsData?.achievements ?? []
+  const healthHistory = goalsData?.healthHistory ?? []
+  const todayHealth = goalsData?.todayHealth ?? null
 
   if (!user) return null
 
@@ -44,10 +20,10 @@ export default function GoalsPage() {
   const completedList = progress.filter((p) => p.status === "completed")
 
   return (
-    <div className="min-h-dvh bg-[var(--background)] pb-8">
-      <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-[var(--card-border)] bg-[var(--background)]/95 px-4 py-4 backdrop-blur-sm">
+    <div className="min-h-dvh pb-8">
+      <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-white/40 px-4 py-4" style={{ background: "rgba(255,255,255,0.45)", backdropFilter: "blur(24px) saturate(1.3)", WebkitBackdropFilter: "blur(24px) saturate(1.3)" }}>
         <button
-          onClick={() => router.back()}
+          onClick={() => goBack()}
           className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--muted)] transition-colors active:bg-[var(--muted)]/80"
         >
           <ArrowLeft className="h-5 w-5" strokeWidth={1.75} />
@@ -62,7 +38,7 @@ export default function GoalsPage() {
             <TrendingUp className="h-4 w-4" strokeWidth={1.75} />
             健康值成长
           </h2>
-          <div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card)] p-4">
+          <div className="glass-card p-4">
             {todayHealth !== null && (
               <p className="mb-3 text-sm text-[var(--foreground-muted)]">
                 今日健康值：<span className="font-medium text-[var(--accent-1)]">{todayHealth}</span> / 100（完成胎动、情绪、放松等即可增加）
@@ -101,7 +77,7 @@ export default function GoalsPage() {
             <Award className="h-4 w-4" strokeWidth={1.75} />
             成就勋章
           </h2>
-          <div className="overflow-hidden rounded-2xl bg-[var(--card)]">
+          <div className="glass-card overflow-hidden">
             {achievements.length === 0 ? (
               <p className="px-4 py-8 text-center text-sm text-[var(--foreground-muted)]">
                 完成目标即可解锁勋章
@@ -111,7 +87,7 @@ export default function GoalsPage() {
                 {achievements.map((a) => (
                   <div
                     key={a.achievementId}
-                    className="flex flex-col items-center gap-2 bg-[var(--card)] px-4 py-5"
+                    className="flex flex-col items-center gap-2 bg-white/40 px-4 py-5"
                   >
                     <div className="flex h-14 w-14 items-center justify-center rounded-full border-2 border-[var(--accent-1)]/50 bg-[var(--accent-1-muted)]">
                       <Award className="h-7 w-7 text-[var(--accent-1)]" strokeWidth={1.5} />
@@ -137,18 +113,18 @@ export default function GoalsPage() {
           </h2>
           <div className="space-y-2">
             {loading ? (
-              <div className="rounded-2xl bg-[var(--card)] p-6 text-center text-sm text-[var(--foreground-muted)]">
+              <div className="glass-card p-6 text-center text-sm text-[var(--foreground-muted)]">
                 加载中...
               </div>
             ) : activeList.length === 0 ? (
-              <p className="rounded-2xl bg-[var(--card)] px-4 py-8 text-center text-sm text-[var(--foreground-muted)]">
+              <p className="glass-card px-4 py-8 text-center text-sm text-[var(--foreground-muted)]">
                 暂无进行中的目标，去记录吧～
               </p>
             ) : (
               activeList.map((p) => (
                 <div
                   key={p.templateId}
-                  className="overflow-hidden rounded-2xl border border-[var(--card-border)] bg-[var(--card)] p-4"
+                  className="glass-card overflow-hidden p-4"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div>
@@ -188,7 +164,7 @@ export default function GoalsPage() {
               {completedList.map((p) => (
                 <div
                   key={p.templateId}
-                  className="flex items-center justify-between rounded-2xl border border-[var(--card-border)] bg-[var(--card)] px-4 py-4"
+                  className="flex items-center justify-between rounded-2xl border border-[var(--card-border)] bg-[var(--card-solid)] px-4 py-4"
                 >
                   <div>
                     <p className="font-medium text-[var(--foreground)]">{p.templateName}</p>

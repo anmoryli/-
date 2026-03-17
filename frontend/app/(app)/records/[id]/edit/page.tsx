@@ -5,6 +5,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation"
 import { ArrowLeft, Upload, Mic, Play, Pause, X } from "lucide-react"
 import { toast } from "sonner"
 import { useAuth } from "@/lib/auth-context"
+import { mutateRecords } from "@/lib/hooks/use-records"
 import {
   getAllEnriched,
   getFamilyEnriched,
@@ -194,6 +195,7 @@ export default function EditRecordPage() {
         visibilityMode,
         (visibilityMode === "allowlist" || visibilityMode === "blocklist") ? visibleTo.join(",") : ""
       )
+      mutateRecords(user?.userId, user?.userType)
       toast.success("修改成功")
       router.push(`/records/${record.id}`)
     } catch (e) {
@@ -370,7 +372,7 @@ export default function EditRecordPage() {
 
       {showVisibleModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowVisibleModal(false)}>
-          <div className="mx-4 max-h-[70vh] w-full max-w-sm overflow-auto rounded-xl border border-[var(--card-border)] bg-[var(--card)] p-4 shadow-lg" onClick={(e) => e.stopPropagation()}>
+          <div className="mx-4 max-h-[70vh] w-full max-w-sm overflow-auto glass-card p-4 shadow-lg" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-body font-semibold">{visibilityMode === "blocklist" ? "选择不可见成员" : "选择可见成员"}</h3>
             <p className="mt-1 text-micro text-[var(--foreground-muted)]">
               {visibilityMode === "blocklist"

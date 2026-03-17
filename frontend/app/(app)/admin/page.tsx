@@ -16,6 +16,10 @@ import {
   Plus,
   Pencil,
   Trash2,
+  Music,
+  Upload,
+  Power,
+  PowerOff,
 } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import {
@@ -39,6 +43,13 @@ import { format } from "date-fns"
 import { zhCN } from "date-fns/locale"
 import { toast } from "sonner"
 import {
+  listAllRelaxMusic,
+  uploadRelaxMusic,
+  updateRelaxMusic,
+  deleteRelaxMusic,
+  type RelaxMusic,
+} from "@/lib/api/relax-music"
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -49,6 +60,134 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
+import { useRef } from "react"
+
+function MusicUploadModal({
+  uploading,
+  onClose,
+  onUpload,
+}: {
+  uploading: boolean
+  onClose: () => void
+  onUpload: (data: {
+    file: File
+    title: string
+    category: string
+    artist?: string
+    description?: string
+    tags?: string
+    durationSeconds?: number
+    cover?: File
+  }) => void
+}) {
+  const [title, setTitle] = useState("")
+  const [artist, setArtist] = useState("")
+  const [description, setDescription] = useState("")
+  const [category, setCategory] = useState<string>("healing")
+  const [tags, setTags] = useState("")
+  const [audioFile, setAudioFile] = useState<File | null>(null)
+  const [coverFile, setCoverFile] = useState<File | null>(null)
+  const [duration, setDuration] = useState<number | undefined>(undefined)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+
+  const handleAudioChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setAudioFile(file)
+    const audio = new Audio()
+    audio.src = URL.createObjectURL(file)
+    audio.addEventListener("loadedmetadata", () => {
+      setDuration(Math.round(audio.duration))
+      URL.revokeObjectURL(audio.src)
+    })
+  }
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!audioFile) {
+      toast.error("请选择音频文件")
+      return
+    }
+    if (!title.trim()) {
+      toast.error("请输入音乐标题")
+      return
+    }
+    onUpload({
+      file: audioFile,
+      title: title.trim(),
+      category,
+      artist: artist.trim() || undefined,
+      description: description.trim() || undefined,
+      tags: tags.trim() || undefined,
+      durationSeconds: duration,
+      cover: coverFile || undefined,
+    })
+  }
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && !uploading && onClose()}>
+      <DialogContent className="border-[var(--card-border)] bg-[var(--card-solid)] sm:max-w-md max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="text-[var(--foreground)]">上传放松音乐</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <Label className="text-caption">音频文件 *</Label>
+            <Input
+              type="file"
+              accept="audio/*"
+              onChange={handleAudioChange}
+              className="mt-1 border-[var(--card-border)]"
+              required
+            />
+            {audioFile && (
+              <p className="mt-1 text-[12px] text-[var(--foreground-muted)]">
+                {audioFile.name} ({(audioFile.size / 1024 / 1024).toFixed(1)} MB)
+                {duration != null && ` · ${Math.floor(duration / 60)}:${String(duration % 60).padStart(2, "0")}`}
+              </p>
+            )}
+          </div>
+          <div>
+            <Label className="text-caption">音乐标题 *</Label>
+            <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="如：疗愈钢琴曲" className="mt-1 border-[var(--card-border)]" required />
+          </div>
+          <div>
+            <Label className="text-caption">分类 *</Label>
+            <select value={category} onChange={(e) => setCategory(e.target.value)} className="mt-1 w-full rounded-lg border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-sm">
+              <option value="healing">专业疗愈音乐</option>
+              <option value="recommend">推荐聆听</option>
+            </select>
+          </div>
+          <div>
+            <Label className="text-caption">艺术家/来源</Label>
+            <Input value={artist} onChange={(e) => setArtist(e.target.value)} placeholder="可选" className="mt-1 border-[var(--card-border)]" />
+          </div>
+          <div>
+            <Label className="text-caption">描述</Label>
+            <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="简短描述音乐特点" className="mt-1 border-[var(--card-border)]" rows={2} />
+          </div>
+          <div>
+            <Label className="text-caption">标签（逗号分隔）</Label>
+            <Input value={tags} onChange={(e) => setTags(e.target.value)} placeholder="如：钢琴,助眠,白噪音" className="mt-1 border-[var(--card-border)]" />
+          </div>
+          <div>
+            <Label className="text-caption">封面图片</Label>
+            <Input
+              type="file"
+              accept="image/*"
+              onChange={(e) => setCoverFile(e.target.files?.[0] || null)}
+              className="mt-1 border-[var(--card-border)]"
+            />
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={onClose} disabled={uploading}>取消</Button>
+            <Button type="submit" disabled={uploading}>{uploading ? "上传中..." : "确认上传"}</Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
 
 function UserEditModal({
   user,
@@ -88,7 +227,7 @@ function UserEditModal({
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="border-[var(--card-border)] bg-[var(--card)] sm:max-w-md">
+      <DialogContent className="border-[var(--card-border)] bg-[var(--card-solid)] sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="text-[var(--foreground)]">编辑用户</DialogTitle>
         </DialogHeader>
@@ -135,9 +274,13 @@ export default function AdminPage() {
   const [users, setUsers] = useState<User[]>([])
   const [articles, setArticles] = useState<AdminArticle[]>([])
   const [articlesLoading, setArticlesLoading] = useState(false)
-  const [activeTab, setActiveTab] = useState<"overview" | "users" | "articles">("overview")
+  const [activeTab, setActiveTab] = useState<"overview" | "users" | "articles" | "music">("overview")
   const [editingUser, setEditingUser] = useState<User | null>(null)
   const [deletingUserId, setDeletingUserId] = useState<number | null>(null)
+  const [musicList, setMusicList] = useState<RelaxMusic[]>([])
+  const [musicLoading, setMusicLoading] = useState(false)
+  const [showMusicUpload, setShowMusicUpload] = useState(false)
+  const [musicUploading, setMusicUploading] = useState(false)
 
   useEffect(() => {
     if (!user) {
@@ -185,7 +328,62 @@ export default function AdminPage() {
         .catch(() => setArticles([]))
         .finally(() => setArticlesLoading(false))
     }
+    if (activeTab === "music") {
+      loadMusic()
+    }
   }, [activeTab])
+
+  const loadMusic = () => {
+    setMusicLoading(true)
+    listAllRelaxMusic()
+      .then((list) => setMusicList(Array.isArray(list) ? list : []))
+      .catch(() => setMusicList([]))
+      .finally(() => setMusicLoading(false))
+  }
+
+  const handleMusicUpload = async (formData: {
+    file: File
+    title: string
+    category: string
+    artist?: string
+    description?: string
+    tags?: string
+    durationSeconds?: number
+    cover?: File
+  }) => {
+    setMusicUploading(true)
+    try {
+      await uploadRelaxMusic(formData)
+      toast.success("音乐上传成功")
+      setShowMusicUpload(false)
+      loadMusic()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "上传失败")
+    } finally {
+      setMusicUploading(false)
+    }
+  }
+
+  const handleMusicToggle = async (music: RelaxMusic) => {
+    try {
+      await updateRelaxMusic({ musicId: music.musicId, isEnabled: !music.isEnabled })
+      toast.success(music.isEnabled ? "已禁用" : "已启用")
+      setMusicList((prev) => prev.map((m) => m.musicId === music.musicId ? { ...m, isEnabled: !m.isEnabled } : m))
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "操作失败")
+    }
+  }
+
+  const handleMusicDelete = async (musicId: number) => {
+    if (!confirm("确定删除该音乐吗？音频文件也会一并删除。")) return
+    try {
+      await deleteRelaxMusic(musicId)
+      toast.success("已删除")
+      setMusicList((prev) => prev.filter((m) => m.musicId !== musicId))
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "删除失败")
+    }
+  }
 
   const loadArticles = () => {
     listAdminArticles().then((list) => setArticles(Array.isArray(list) ? list : [])).catch(() => {})
@@ -278,7 +476,7 @@ export default function AdminPage() {
               : "text-[var(--foreground-muted)]"
           )}
         >
-          数据概览
+          概览
         </button>
         <button
           onClick={() => setActiveTab("users")}
@@ -289,7 +487,7 @@ export default function AdminPage() {
               : "text-[var(--foreground-muted)]"
           )}
         >
-          用户列表
+          用户
         </button>
         <button
           onClick={() => setActiveTab("articles")}
@@ -300,7 +498,18 @@ export default function AdminPage() {
               : "text-[var(--foreground-muted)]"
           )}
         >
-          文章管理
+          文章
+        </button>
+        <button
+          onClick={() => setActiveTab("music")}
+          className={cn(
+            "flex-1 rounded-lg py-2.5 text-[14px] font-medium transition-colors",
+            activeTab === "music"
+              ? "bg-[var(--card)] text-[var(--foreground)] shadow-sm"
+              : "text-[var(--foreground-muted)]"
+          )}
+        >
+          音乐
         </button>
       </div>
 
@@ -424,7 +633,7 @@ export default function AdminPage() {
             </div>
           )}
         </div>
-      ) : (
+      ) : activeTab === "articles" ? (
         <div className="card-elevated overflow-hidden rounded-xl">
           <div className="flex items-center justify-between border-b border-[var(--card-border)] px-4 py-4">
             <h2 className="text-[15px] font-semibold text-[var(--foreground)]">文章列表</h2>
@@ -484,7 +693,80 @@ export default function AdminPage() {
             </div>
           )}
         </div>
-      )}
+      ) : activeTab === "music" ? (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-[15px] font-semibold text-[var(--foreground)]">放松音乐管理</h2>
+            <button
+              onClick={() => setShowMusicUpload(true)}
+              className="flex items-center gap-1.5 rounded-lg bg-[var(--accent-1)] px-3 py-2 text-sm font-medium text-white"
+            >
+              <Upload className="h-4 w-4" strokeWidth={2} />
+              上传音乐
+            </button>
+          </div>
+
+          {musicLoading ? (
+            <div className="flex min-h-[120px] items-center justify-center py-8">
+              <div className="h-6 w-6 animate-spin rounded-full border-2 border-[var(--accent-1)]/30 border-t-[var(--accent-1)]" />
+            </div>
+          ) : musicList.length === 0 ? (
+            <div className="card-elevated rounded-xl py-12 text-center text-caption">
+              暂无音乐，点击上方按钮上传
+            </div>
+          ) : (
+            <div className="card-elevated overflow-hidden rounded-xl divide-y divide-[var(--card-border)]">
+              {musicList.map((m) => (
+                <div key={m.musicId} className="flex items-center gap-3 px-4 py-3.5">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[var(--accent-2)]/30 bg-[var(--accent-2-muted)]">
+                    <Music className="h-5 w-5 text-[var(--accent-2)]" strokeWidth={1.75} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium text-[var(--foreground)] truncate">{m.title}</p>
+                    <p className="text-[12px] text-caption truncate">
+                      {m.artist && `${m.artist} · `}
+                      {m.category === "healing" ? "疗愈音乐" : "推荐聆听"}
+                      {m.tags && ` · ${m.tags}`}
+                      {m.durationSeconds && ` · ${Math.floor(m.durationSeconds / 60)}:${String(m.durationSeconds % 60).padStart(2, "0")}`}
+                      {!m.isEnabled && " · 已禁用"}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 gap-1.5">
+                    <button
+                      onClick={() => handleMusicToggle(m)}
+                      className={cn(
+                        "rounded-lg border p-2 transition-colors",
+                        m.isEnabled
+                          ? "border-[var(--accent-2)]/30 text-[var(--accent-2)] hover:bg-[var(--accent-2-muted)]"
+                          : "border-[var(--foreground-muted)]/30 text-[var(--foreground-muted)] hover:bg-[var(--muted)]"
+                      )}
+                      aria-label={m.isEnabled ? "禁用" : "启用"}
+                      title={m.isEnabled ? "点击禁用" : "点击启用"}
+                    >
+                      {m.isEnabled ? <Power className="h-4 w-4" strokeWidth={1.75} /> : <PowerOff className="h-4 w-4" strokeWidth={1.75} />}
+                    </button>
+                    <button
+                      onClick={() => handleMusicDelete(m.musicId)}
+                      className="rounded-lg border border-[var(--critical)]/30 p-2 text-[var(--critical)] hover:bg-[var(--critical-muted)]"
+                      aria-label="删除"
+                    >
+                      <Trash2 className="h-4 w-4" strokeWidth={1.75} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {showMusicUpload && (
+            <MusicUploadModal
+              uploading={musicUploading}
+              onClose={() => setShowMusicUpload(false)}
+              onUpload={handleMusicUpload}
+            />
+          )}
+        </div>
+      ) : null}
 
       {/* 用户编辑弹窗 */}
       {editingUser && (

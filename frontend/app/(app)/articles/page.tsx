@@ -1,14 +1,14 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useBack } from "@/lib/use-back"
 import Link from "next/link"
 import { ArrowLeft, FileText, ChevronRight } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import { listArticles, type Article } from "@/lib/api/article"
 
 export default function ArticlesPage() {
-  const router = useRouter()
+  const goBack = useBack("/")
   const { user } = useAuth()
   const [articles, setArticles] = useState<Article[]>([])
   const [loading, setLoading] = useState(true)
@@ -23,10 +23,10 @@ export default function ArticlesPage() {
   if (!user) return null
 
   return (
-    <div className="min-h-dvh bg-[var(--background)]">
+    <div className="min-h-dvh">
       <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-[var(--card-border)] bg-[var(--card)]/98 px-4 py-4 backdrop-blur-sm">
         <button
-          onClick={() => router.back()}
+          onClick={() => goBack()}
           className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--muted)] transition-colors active:bg-[var(--card)]"
         >
           <ArrowLeft className="h-5 w-5" />
@@ -56,7 +56,7 @@ export default function ArticlesPage() {
               <Link
                 key={a.articleId}
                 href={`/articles/${a.articleId}`}
-                className="flex items-center gap-3 rounded-xl border border-[var(--card-border)] bg-[var(--card)] p-4 transition-colors active:bg-[var(--muted)]"
+                className="flex items-center gap-3 glass-card p-4 transition-colors active:bg-[var(--muted)]"
               >
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--accent-1-muted)] text-[var(--accent-1)]">
                   <FileText className="h-5 w-5" strokeWidth={1.75} />

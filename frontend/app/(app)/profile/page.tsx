@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { addMonths } from "date-fns"
 import {
@@ -8,6 +8,7 @@ import {
   ChevronRight,
   BookOpen,
   Heart,
+  HeartPulse,
   Settings,
   Bell,
   Shield,
@@ -26,9 +27,9 @@ import {
 } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import { updatePregnancy, updateUsername, uploadAvatar, updateAvatar } from "@/lib/api/user"
-import { getAllEnriched, type MemoItem } from "@/lib/api/memo"
-import { getUnreadCount } from "@/lib/api/notifications"
-import { getCreatorPregnancy } from "@/lib/api/family"
+import { useRecords } from "@/lib/hooks/use-records"
+import { useUnreadCount } from "@/lib/hooks/use-notifications"
+import { useCreatorPregnancy } from "@/lib/hooks/use-family"
 import { getPregnancyInfo } from "@/lib/pregnancy"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import {
@@ -69,71 +70,11 @@ export default function ProfilePage() {
     user?.pregnancyTime ? user.pregnancyTime.slice(0, 10) : ""
   )
   const [saving, setSaving] = useState(false)
-  const [records, setRecords] = useState<MemoItem[]>([])
-  const [loadingRecords, setLoadingRecords] = useState(true)
-  const [unreadCount, setUnreadCount] = useState(0)
-  const [creatorPregnancy, setCreatorPregnancy] = useState<{
-    creatorUsername: string
-    recordCount: number
-    lastMenstrualDate: string | null
-    pregnancyTime: string | null
-  } | null>(null)
 
-  // Fetch user records count（孕妇本人）
-  useEffect(() => {
-    if (!user) return
-    setLoadingRecords(true)
-    getAllEnriched(user.userId)
-      .then((data) => setRecords(data || []))
-      .catch(() => setRecords([]))
-      .finally(() => setLoadingRecords(false))
-  }, [user])
-
-  // 家庭成员或孕妇本人：拉取怀孕进度与记录统计（总/妈/爸）
-  useEffect(() => {
-    if (!user) {
-      setCreatorPregnancy(null)
-      return
-    }
-    if (user.userType !== "family_member" && user.userType !== "pregnant") {
-      setCreatorPregnancy(null)
-      return
-    }
-    getCreatorPregnancy(user.userId)
-      .then((data) => {
-        if (data && (data.lastMenstrualDate || data.pregnancyTime || typeof data.recordCount === "number"))
-          setCreatorPregnancy({
-            creatorUsername: data.creatorUsername || "孕妇",
-            recordCount: data.recordCount ?? 0,
-            recordCountTotal: data.recordCountTotal,
-            recordCountMom: data.recordCountMom,
-            recordCountDad: data.recordCountDad,
-            lastMenstrualDate: data.lastMenstrualDate ?? null,
-            pregnancyTime: data.pregnancyTime ?? null,
-          })
-        else setCreatorPregnancy(null)
-      })
-      .catch(() => setCreatorPregnancy(null))
-  }, [user?.userId, user?.userType])
-
-  // Fetch unread notifications count (poll; toast when new messages arrive)
-  useEffect(() => {
-    if (!user) return
-    let prev = 0
-    const fetchUnread = () => {
-      getUnreadCount(user.userId)
-        .then((n) => {
-          const count = n ?? 0
-          if (count > prev) toast.info(`您有 ${count} 条未读站内消息`, { id: "unread-notifications" })
-          prev = count
-          setUnreadCount(count)
-        })
-        .catch(() => setUnreadCount(0))
-    }
-    fetchUnread()
-    const t = setInterval(fetchUnread, 30000)
-    return () => clearInterval(t)
-  }, [user])
+  const { data: records = [], isLoading: loadingRecords } = useRecords(user?.userId, user?.userType)
+  const { data: unreadCount = 0 } = useUnreadCount(user?.userId)
+  const shouldFetchPregnancy = user?.userType === "family_member" || user?.userType === "pregnant"
+  const { data: creatorPregnancy = null } = useCreatorPregnancy(shouldFetchPregnancy ? user?.userId : undefined)
 
   if (!user) return null
 
@@ -237,6 +178,7 @@ export default function ProfilePage() {
   const menuItems = [
     ...(isAdmin ? [{ label: "管理后台", icon: BarChart3, href: "/admin" }] : []),
     ...(user.userType === "pregnant" ? [
+      { label: "健康档案", icon: HeartPulse, href: "/profile/health-history" },
       { label: "孕期小目标", icon: Target, href: "/goals" },
       { label: "减压放松", icon: Wind, href: "/relax" },
     ] : []),
@@ -260,7 +202,7 @@ export default function ProfilePage() {
   return (
     <div className="px-6 pt-14 pb-8">
       {/* Profile Header */}
-      <div className="card-elevated rounded-xl p-6">
+      <div className="card-elevated rounded-lg p-6">
         <div className="flex items-center gap-4">
           <Avatar className="h-16 w-16 shrink-0 border-2 border-[var(--accent-1)]/30">
             {user.avatarUrl ? (
@@ -281,8 +223,8 @@ export default function ProfilePage() {
               {user.username}
             </h1>
             <div className="mt-1 flex flex-wrap items-center gap-3 text-caption">
-              <span className="rounded-full bg-[var(--accent-1-muted)] px-2 py-0.5 text-xs text-[var(--accent-1)]">
-                {user.userType === "family_member" ? "家庭成员 · 仅查看" : "孕妇本人 · 可记录"}
+              <span className="shrink-0 whitespace-nowrap rounded-full bg-[var(--accent-1-muted)] px-2 py-0.5 text-xs text-[var(--accent-1)]">
+                {user.userType === "family_member" ? "家庭成员·仅查看" : "孕妇本人·可记录"}
               </span>
               {info && (
                 <span className="flex items-center gap-1">
@@ -307,11 +249,11 @@ export default function ProfilePage() {
             }}
           >
             <DialogTrigger asChild>
-              <button className="rounded-lg border border-[var(--card-border)] bg-[var(--muted)] px-3 py-2 text-[12px] font-medium text-[var(--foreground-secondary)] transition-colors active:bg-[var(--card)]">
+              <button className="rounded-lg border border-[var(--card-border)] bg-[var(--muted)] px-3 py-2 text-[12px] font-medium text-[var(--foreground-secondary)] transition-colors active:bg-[var(--card-solid)]">
                 编辑
               </button>
             </DialogTrigger>
-            <DialogContent className="max-w-sm border-[var(--card-border)]">
+            <DialogContent className="max-w-sm border-[var(--card-border)] bg-[var(--card-solid)]">
               <DialogHeader>
                 <DialogTitle className="text-[var(--foreground)]">编辑资料</DialogTitle>
               </DialogHeader>
@@ -338,7 +280,7 @@ export default function ProfilePage() {
                         {user.username.charAt(0).toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
-                    <label className="cursor-pointer rounded-lg border border-[var(--card-border)] bg-[var(--muted)] px-3 py-2 text-[13px] font-medium text-[var(--foreground-secondary)] transition-colors active:bg-[var(--card)]">
+                    <label className="cursor-pointer rounded-lg border border-[var(--card-border)] bg-[var(--muted)] px-3 py-2 text-[13px] font-medium text-[var(--foreground-secondary)] transition-colors active:bg-[var(--card-solid)]">
                       <input
                         type="file"
                         accept="image/*"
@@ -402,15 +344,16 @@ export default function ProfilePage() {
       </div>
 
       {/* Stats */}
-      <div className="mt-6 grid grid-cols-3 gap-3">
-        {stats.map((stat) => {
-          const Icon = stat.icon
-          const isRecordStat = stat.label === "孕期记录"
-          return (
-            <div
-              key={stat.label}
-              className="card-elevated flex min-w-0 flex-col items-center gap-2 rounded-xl py-4"
-            >
+      <div className="card-elevated mt-6 overflow-hidden rounded-lg">
+        <div className="flex">
+          {stats.map((stat, i) => {
+            const Icon = stat.icon
+            const isRecordStat = stat.label === "孕期记录"
+            return (
+              <div
+                key={stat.label}
+                className={`flex min-w-0 flex-1 flex-col items-center gap-1.5 py-4 ${i < stats.length - 1 ? "border-r border-[var(--card-border)]" : ""}`}
+              >
               <div
                 className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border ${stat.color}`}
               >
@@ -425,14 +368,15 @@ export default function ProfilePage() {
                 )}
               </span>
               <span className="text-micro shrink-0">{stat.label}</span>
-            </div>
-          )
-        })}
+              </div>
+            )
+          })}
+        </div>
       </div>
 
       {/* Pregnancy Progress Card — 孕妇本人或家庭成员（展示孕妇进度） */}
       {info && (user.userType === "pregnant" || creatorPregnancy) && (
-        <div className="card-elevated mt-6 rounded-xl p-5">
+        <div className="card-elevated mt-6 overflow-hidden rounded-lg p-5">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-[15px] font-medium text-[var(--foreground)]">
@@ -460,7 +404,7 @@ export default function ProfilePage() {
       )}
 
       {/* Menu — clean list, subtle dividers */}
-      <div className="card-elevated mt-6 overflow-hidden rounded-xl">
+      <div className="card-elevated mt-6 overflow-hidden rounded-lg">
         {menuItems.map((item, index) => {
           const Icon = item.icon
           return (
@@ -489,7 +433,7 @@ export default function ProfilePage() {
       {/* Logout Button */}
       <AlertDialog>
         <AlertDialogTrigger asChild>
-          <button className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl border border-[var(--card-border)] bg-[var(--card)] py-3.5 text-[14px] font-medium text-[var(--critical)] transition-colors active:bg-[var(--critical-muted)]">
+          <button className="glass-card mt-6 flex w-full items-center justify-center gap-2 py-3.5 text-[14px] font-medium text-[var(--critical)] transition-colors active:bg-[var(--critical-muted)]">
             <LogOut className="h-4 w-4" strokeWidth={1.75} />
             退出登录
           </button>

@@ -47,7 +47,7 @@ export function KickCounter({ userId }: KickCounterProps) {
       type="button"
       onClick={handleKick}
       disabled={loading}
-      className="flex items-center gap-2 rounded-xl border border-[var(--accent-1)]/40 bg-[var(--accent-1-muted)] px-4 py-3 transition-colors active:opacity-90 disabled:opacity-70"
+      className="glass-card flex items-center gap-2 px-4 py-3 transition-colors active:opacity-90 disabled:opacity-70"
     >
       <Heart className="h-5 w-5 text-[var(--accent-1)]" strokeWidth={1.75} fill="currentColor" />
       <span className="text-[14px] font-medium text-[var(--foreground)]">胎动</span>

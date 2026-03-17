@@ -246,7 +246,7 @@ public class AiController {
     /** 标记会话已读（清除未读 AI 红点） */
     @PostMapping("/conversation/markRead")
     public Result<Void> markConversationRead(@RequestParam Integer userId,
-                                            @RequestParam Integer conversationId) {
+                                          @RequestParam Integer conversationId) {
         Conversation conv = conversationService.getByIdAndUserId(conversationId, userId);
         if (conv == null) {
             return Result.error(403, ErrorCode.FORBIDDEN.key(), "无权限或会话不存在");
@@ -797,7 +797,8 @@ public class AiController {
                                     boolean sent = false;
                                     for (Integer sid : spouseIds) {
                                         User spouse = userService.getById(sid);
-                                        if (spouse != null && spouse.getEmail() != null && !spouse.getEmail().isBlank()) {
+                                        if (spouse != null && spouse.getEmail() != null && !spouse.getEmail().isBlank()
+                                                && !Boolean.FALSE.equals(spouse.getEmailEnabled())) {
                                             try {
                                                 String subject = "孕期宝：有人在新对话中提到了你";
                                                 String snippet = safeQuestion.length() > 100 ? safeQuestion.substring(0, 100) + "…" : safeQuestion;
@@ -824,7 +825,8 @@ public class AiController {
                             } else if (family != null && family.getCreatorUserId() != null) {
                                 // 当前用户是配偶：向孕妇（创建者）发邮件
                                 User creator = userService.getById(family.getCreatorUserId());
-                                if (creator != null && creator.getEmail() != null && !creator.getEmail().isBlank()) {
+                                if (creator != null && creator.getEmail() != null && !creator.getEmail().isBlank()
+                                        && !Boolean.FALSE.equals(creator.getEmailEnabled())) {
                                     try {
                                         User me = userService.getById(userId);
                                         String meName = me != null ? me.getUsername() : "家人";

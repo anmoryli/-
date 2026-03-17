@@ -22,8 +22,6 @@ import {
 } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import {
-  getAllEnriched,
-  getFamilyEnriched,
   deleteText,
   deletePhoto,
   deleteVoice,
@@ -31,7 +29,8 @@ import {
   exportPdfToEmail,
   type MemoItem,
 } from "@/lib/api/memo"
-import { getMyFamily, getFamilyMembers } from "@/lib/api/family"
+import { useRecords, mutateRecords } from "@/lib/hooks/use-records"
+import { useMyFamily, useFamilyMembers } from "@/lib/hooks/use-family"
 import { getPregnancyInfo } from "@/lib/pregnancy"
 import {
   DropdownMenu,
@@ -167,16 +166,11 @@ function getTagLabel(record: MemoItem): string {
 export default function RecordsPage() {
   const router = useRouter()
   const { user } = useAuth()
-  const [records, setRecords] = useState<MemoItem[]>([])
   const [filter, setFilter] = useState("all")
   const [recordFilter, setRecordFilter] = useState<"all" | "mom" | "dad">("all")
-  const [loading, setLoading] = useState(true)
   const [dateRangeFrom, setDateRangeFrom] = useState<string>("")
   const [dateRangeTo, setDateRangeTo] = useState<string>("")
   const [keyword, setKeyword] = useState("")
-  const [creatorUserId, setCreatorUserId] = useState<number | null>(null)
-  const [creatorUsername, setCreatorUsername] = useState<string>("")
-  const [hasFamilyTwo, setHasFamilyTwo] = useState(false)
   const [showExportModal, setShowExportModal] = useState(false)
   const [exportScope, setExportScope] = useState<"mom" | "dad" | "both">("both")
   const [exportFromDate, setExportFromDate] = useState("")
@@ -187,7 +181,18 @@ export default function RecordsPage() {
   const isFamilyMember = user?.userType === "family_member"
   const canAddRecord = !isFamilyMember || !!user?.isSpouse
 
-  // 红→蓝→绿曲线：以视口中心为基准，远离中心的卡片沿曲线过渡（向中线靠拢+缩放）直至“消失感”，无透明度变化
+  const { data: family } = useMyFamily(user?.userId)
+  const { data: members = [] } = useFamilyMembers(family?.familyId, user?.userId)
+
+  const hasSpouse = members.some((m) => m.isSpouse)
+  const hasFamilyTwo = !!family && hasSpouse
+
+  const { data: records = [], isLoading: loading } = useRecords(user?.userId, user?.userType, hasFamilyTwo)
+  const creator = members.find((m) => m.role === "creator")
+  const creatorUserId = isFamilyMember && family ? family.creatorUserId : (user?.userId ?? null)
+  const creatorUsername = isFamilyMember ? (creator?.username || "家人") : (user?.username || "用户")
+
+  // 红→蓝→绿曲线：以视口中心为基准，远离中心的卡片沿曲线过渡（向中线靠拢+缩放）直至"消失感"，无透明度变化：以视口中心为基准，远离中心的卡片沿曲线过渡（向中线靠拢+缩放）直至“消失感”，无透明度变化
   const updateScrollState = useCallback(() => {
     const container = timelineContainerRef.current
     if (!container) return
@@ -218,58 +223,6 @@ export default function RecordsPage() {
     }
   }, [updateScrollState, loading, records.length])
 
-  const fetchRecords = useCallback(async () => {
-    if (!user) return
-    setLoading(true)
-    try {
-      let targetUserId = user.userId
-      let targetUsername = user.username || "用户"
-      if (isFamilyMember) {
-        const family = await getMyFamily(user.userId)
-        if (family) {
-          targetUserId = family.creatorUserId
-          setCreatorUserId(family.creatorUserId)
-          const members = await getFamilyMembers(family.familyId, user.userId)
-          const creator = members.find((m) => m.role === "creator")
-          targetUsername = creator?.username || "家人"
-          setCreatorUsername(targetUsername)
-        } else {
-          setCreatorUserId(null)
-          setCreatorUsername("")
-          setHasFamilyTwo(false)
-          setRecords([])
-          setLoading(false)
-          return
-        }
-      } else {
-        setCreatorUserId(user.userId)
-        setCreatorUsername(targetUsername)
-        setHasFamilyTwo(false)
-      }
-      const family = await getMyFamily(user.userId)
-      const members = family ? await getFamilyMembers(family.familyId, user.userId) : []
-      const hasSpouse = (members ?? []).some((m) => m.isSpouse)
-      let data: MemoItem[]
-      if (family && hasSpouse) {
-        data = await getFamilyEnriched(user.userId)
-        setHasFamilyTwo(true)
-      } else {
-        data = await getAllEnriched(targetUserId, user.userId)
-        setHasFamilyTwo(false)
-      }
-      setRecords(data || [])
-    } catch {
-      toast.error("获取记录失败")
-      setRecords([])
-    } finally {
-      setLoading(false)
-    }
-  }, [user, isFamilyMember])
-
-  useEffect(() => {
-    fetchRecords()
-  }, [fetchRecords])
-
   const handleDelete = useCallback(
     async (record: MemoItem) => {
       try {
@@ -288,12 +241,12 @@ export default function RecordsPage() {
             break
         }
         toast.success("记录已删除")
-        fetchRecords()
+        mutateRecords(user?.userId, user?.userType, hasFamilyTwo)
       } catch {
         toast.error("删除失败")
       }
     },
-    [fetchRecords]
+    [user?.userId, user?.userType, hasFamilyTwo]
   )
 
   const recordByFiltered =
@@ -365,9 +318,9 @@ export default function RecordsPage() {
   if (!user) return null
 
   return (
-    <div className="min-h-dvh bg-[var(--background)] px-6 pt-14 pb-8">
+    <div className="min-h-dvh px-6 pt-14 pb-8">
       {/* Header — 固定在顶部 */}
-      <div className="sticky top-0 z-10 -mx-6 -mt-14 flex items-center justify-between border-b border-[var(--card-border)] bg-[var(--background)]/95 px-6 py-4 backdrop-blur-sm">
+      <div className="sticky top-0 z-10 -mx-6 -mt-14 flex items-center justify-between border-b border-white/40 px-6 py-4" style={{ background: "rgba(255,255,255,0.45)", backdropFilter: "blur(24px) saturate(1.3)", WebkitBackdropFilter: "blur(24px) saturate(1.3)" }}>
         <div>
           <h1
             className="text-[1.4rem] font-semibold tracking-tight text-[var(--foreground)]"
@@ -427,7 +380,7 @@ export default function RecordsPage() {
       {/* 导出 PDF 模态框：发邮箱、范围、日期 */}
       {showExportModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => !exportSubmitting && setShowExportModal(false)}>
-          <div className="w-full max-w-sm rounded-xl border border-[var(--card-border)] bg-[var(--card)] p-4 shadow-lg" onClick={(e) => e.stopPropagation()}>
+          <div className="w-full max-w-sm rounded-2xl border border-white/60 bg-[var(--card-solid)] p-4 shadow-xl" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-body font-semibold text-[var(--foreground)]">导出 PDF 至邮箱</h3>
             <p className="mt-1 text-[13px] text-[var(--foreground-muted)]">完成后将发送至你的邮箱，请稍候查收。</p>
             <div className="mt-4 space-y-3">
@@ -501,25 +454,23 @@ export default function RecordsPage() {
         </div>
       )}
 
-      {/* 日期范围分享 */}
+      {/* 日期筛选 */}
       {sortedDates.length > 0 && (
-        <div className="mt-6 flex flex-wrap items-center gap-3 rounded-xl border border-[var(--card-border)] bg-[var(--card)] p-4">
-          <Calendar className="h-5 w-5 text-[var(--accent-1)]" strokeWidth={1.75} />
-          <div className="flex flex-wrap items-center gap-2">
-            <input
-              type="date"
-              value={dateRangeFrom}
-              onChange={(e) => setDateRangeFrom(e.target.value)}
-              className="rounded-lg border border-[var(--card-border)] bg-[var(--muted)] px-3 py-2 text-[13px] text-[var(--foreground)]"
-            />
-            <span className="text-[var(--foreground-muted)]">至</span>
-            <input
-              type="date"
-              value={dateRangeTo}
-              onChange={(e) => setDateRangeTo(e.target.value)}
-              className="rounded-lg border border-[var(--card-border)] bg-[var(--muted)] px-3 py-2 text-[13px] text-[var(--foreground)]"
-            />
-          </div>
+        <div className="mt-4 flex flex-wrap items-center gap-2 rounded-xl border border-white/40 px-3 py-2" style={{ background: "rgba(255,255,255,0.45)", backdropFilter: "blur(16px) saturate(1.2)", WebkitBackdropFilter: "blur(16px) saturate(1.2)" }}>
+          <Calendar className="h-4 w-4 shrink-0 text-[var(--accent-1)]" strokeWidth={1.75} />
+          <input
+            type="date"
+            value={dateRangeFrom}
+            onChange={(e) => setDateRangeFrom(e.target.value)}
+            className="min-w-[160px] flex-1 rounded-lg border border-[var(--accent-1)]/20 bg-white/60 px-3 py-2 text-[13px] text-[var(--foreground)] outline-none focus:border-[var(--accent-1)]/50 [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+          />
+          <span className="shrink-0 text-[12px] text-[var(--foreground-muted)]">至</span>
+          <input
+            type="date"
+            value={dateRangeTo}
+            onChange={(e) => setDateRangeTo(e.target.value)}
+            className="min-w-[160px] flex-1 rounded-lg border border-[var(--accent-1)]/20 bg-white/60 px-3 py-2 text-[13px] text-[var(--foreground)] outline-none focus:border-[var(--accent-1)]/50 [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+          />
           <DateRangeShare
             userId={creatorUserId ?? user!.userId}
             username={creatorUsername || user!.username || "用户"}
@@ -696,7 +647,7 @@ export default function RecordsPage() {
                           {record.photoUrls.slice(0, 3).map((url, i) => (
                             <div key={i} className="h-9 w-9 shrink-0 overflow-hidden rounded-lg bg-[var(--muted)]">
                               {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img src={url} alt="" className="h-full w-full object-cover" referrerPolicy="no-referrer" />
+                              <img src={url} alt="" loading="lazy" className="h-full w-full object-cover" referrerPolicy="no-referrer" />
                             </div>
                           ))}
                           {record.photoUrls.length > 3 && (

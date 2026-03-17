@@ -149,7 +149,7 @@ public class ProactiveIceBreakServiceImpl implements ProactiveIceBreakService {
             userNotificationService.notifySystem(spouseUserId, "孕期小伴给你发了一条消息", content.length() > 50 ? content.substring(0, 50) + "…" : content);
             try {
                 User u = userService.getById(spouseUserId);
-                if (u != null && u.getEmail() != null && !u.getEmail().isBlank()) {
+                if (u != null && u.getEmail() != null && !u.getEmail().isBlank() && !Boolean.FALSE.equals(u.getEmailEnabled())) {
                     String htmlBody = com.anmory.yunji.service.impl.MailServiceImpl.wrapHtmlBodyWithStyle(
                         com.anmory.yunji.service.impl.MailServiceImpl.textToHtmlParagraphs("孕期小伴：" + content));
                     mailService.sendHtmlMail(u.getEmail(), "孕期小伴给你发了一条消息", htmlBody);
@@ -160,7 +160,7 @@ public class ProactiveIceBreakServiceImpl implements ProactiveIceBreakService {
         }
         try {
             User mom = userService.getById(creatorUserId);
-            if (mom != null && mom.getEmail() != null && !mom.getEmail().isBlank()) {
+            if (mom != null && mom.getEmail() != null && !mom.getEmail().isBlank() && !Boolean.FALSE.equals(mom.getEmailEnabled())) {
                 String htmlBody = com.anmory.yunji.service.impl.MailServiceImpl.wrapHtmlBodyWithStyle(
                         com.anmory.yunji.service.impl.MailServiceImpl.textToHtmlParagraphs("孕期小伴：" + content));
                     mailService.sendHtmlMail(mom.getEmail(), "孕期小伴给你发了一条消息", htmlBody);

@@ -1,7 +1,9 @@
 package com.anmory.yunji.service.impl;
 
+import com.anmory.yunji.entity.FamilyMember;
 import com.anmory.yunji.entity.User;
 import com.anmory.yunji.exception.BusinessException;
+import com.anmory.yunji.mapper.FamilyMemberMapper;
 import com.anmory.yunji.mapper.UserMapper;
 
 import com.anmory.yunji.service.MailService;
@@ -41,6 +43,9 @@ public class UserServiceImpl implements UserService {
 
     @Autowired
     private MailService mailService;
+
+    @Autowired
+    private FamilyMemberMapper familyMemberMapper;
 
     private static final String REDIS_KEY_PWD_CODE = "pwd_code:";
     private static final Duration PWD_CODE_TTL = Duration.ofMinutes(10);
@@ -112,15 +117,76 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    public Boolean getCommunityEnabled(Integer userId) {
+        User user = userMapper.selectById(userId);
+        return user != null ? Boolean.TRUE.equals(user.getCommunityEnabled()) : false;
+    }
+
+    @Override
     @CacheEvict(value = "user", key = "#userId")
-    public User updateUserType(Integer userId, String userType) {
+    public void updateCommunityEnabled(Integer userId, boolean enabled) {
         User user = userMapper.selectById(userId);
         if (user == null) throw new BusinessException("用户不存在");
-        if (userType != null && ("pregnant".equals(userType) || "family_member".equals(userType))) {
-            user.setUserType(userType);
-            user.setUpdatedAt(LocalDateTime.now());
-            userMapper.update(user);
+        user.setCommunityEnabled(enabled);
+        user.setUpdatedAt(LocalDateTime.now());
+        userMapper.update(user);
+    }
+
+    @Override
+    public Boolean getEmailEnabled(Integer userId) {
+        User user = userMapper.selectById(userId);
+        return user == null || !Boolean.FALSE.equals(user.getEmailEnabled());
+    }
+
+    @Override
+    @CacheEvict(value = "user", key = "#userId")
+    public void updateEmailEnabled(Integer userId, boolean enabled) {
+        User user = userMapper.selectById(userId);
+        if (user == null) throw new BusinessException("用户不存在");
+        user.setEmailEnabled(enabled);
+        user.setUpdatedAt(LocalDateTime.now());
+        userMapper.update(user);
+    }
+
+    @Override
+    @CacheEvict(value = "user", key = "#userId")
+    public User updateUserType(Integer userId, String userType, String defaultRelationship) {
+        User user = userMapper.selectById(userId);
+        if (user == null) throw new BusinessException("用户不存在");
+        if (userType == null || (!"pregnant".equals(userType) && !"family_member".equals(userType))) {
+            return userMapper.selectById(userId);
         }
+
+        if ("family_member".equals(userType) && defaultRelationship != null && !defaultRelationship.isBlank()) {
+            String rel = defaultRelationship.trim();
+            List<FamilyMember> memberships = familyMemberMapper.findByUserId(userId);
+            if (!memberships.isEmpty()) {
+                FamilyMember myMembership = memberships.get(0);
+                Integer familyId = myMembership.getFamilyId();
+                List<FamilyMember> allMembers = familyMemberMapper.findByFamilyId(familyId);
+
+                boolean isSpouseRole = "配偶".equals(rel) || "老公".equals(rel) || "丈夫".equals(rel) || "老婆".equals(rel);
+                for (FamilyMember m : allMembers) {
+                    if (m.getUserId().equals(userId)) continue;
+                    if (isSpouseRole && Boolean.TRUE.equals(m.getIsSpouse())) {
+                        throw new BusinessException("家里已经有一位配偶啦，换个身份试试吧～");
+                    }
+                    if (rel.equals(m.getRelationship())) {
+                        throw new BusinessException("家里已经有一位" + rel + "啦，换个身份试试吧～");
+                    }
+                }
+
+                familyMemberMapper.updateRelationship(myMembership.getMemberId(), rel);
+                if (isSpouseRole) {
+                    familyMemberMapper.updateIsSpouse(myMembership.getMemberId(), true);
+                }
+            }
+            user.setDefaultRelationship(rel);
+        }
+
+        user.setUserType(userType);
+        user.setUpdatedAt(LocalDateTime.now());
+        userMapper.update(user);
         return userMapper.selectById(userId);
     }
 
@@ -246,6 +312,7 @@ public class UserServiceImpl implements UserService {
     public void sendPasswordCodeToUserEmail(Integer userId) {
         User user = userMapper.selectById(userId);
         if (user == null) throw new BusinessException("用户不存在");
+        if (Boolean.FALSE.equals(user.getEmailEnabled())) throw new BusinessException("你已关闭邮箱消息接收，无法发送验证码");
         String email = user.getEmail();
         if (email == null || email.isBlank()) throw new BusinessException("请先绑定邮箱");
         sendPasswordCodeToEmail(email.trim());
@@ -257,6 +324,7 @@ public class UserServiceImpl implements UserService {
         String trimmed = email.trim();
         User user = userMapper.selectByEmail(trimmed);
         if (user == null) throw new BusinessException("该邮箱未绑定任何账号");
+        if (Boolean.FALSE.equals(user.getEmailEnabled())) throw new BusinessException("你已关闭邮箱消息接收，无法发送验证码");
         if (stringRedisTemplate == null) throw new BusinessException("验证码服务暂不可用，请稍后再试");
         String code = String.format("%06d", 100000 + RANDOM.nextInt(900000));
         String key = REDIS_KEY_PWD_CODE + trimmed;

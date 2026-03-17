@@ -67,7 +67,7 @@ export default function ScenarioPage() {
   if (user.isSpouse !== true) return null
 
   return (
-    <div className="flex min-h-dvh flex-col bg-[var(--background)]">
+    <div className="flex min-h-dvh flex-col">
       <div className="border-b border-[var(--card-border)] bg-[var(--card)] px-6 pt-14 pb-4">
         <div className="flex items-center gap-3">
           <Link
@@ -90,7 +90,7 @@ export default function ScenarioPage() {
       <div className="flex-1 px-6 py-4">
         <Link
           href="/scenario/reports"
-          className="mb-4 flex items-center gap-3 rounded-xl border border-[var(--card-border)] bg-[var(--card)] px-4 py-3 text-left transition-colors active:bg-[var(--muted)]"
+          className="mb-4 flex items-center gap-3 glass-card px-4 py-3 text-left transition-colors active:bg-[var(--muted)]"
         >
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[var(--accent-1)]/30 bg-[var(--accent-1-muted)]">
             <FileText className="h-5 w-5 text-[var(--accent-1)]" strokeWidth={1.75} />
@@ -106,7 +106,7 @@ export default function ScenarioPage() {
             {[1, 2, 3].map((i) => (
               <div
                 key={i}
-                className="h-24 animate-pulse rounded-xl border border-[var(--card-border)] bg-[var(--card)]"
+                className="h-24 animate-pulse glass-card"
               />
             ))}
           </div>
@@ -123,7 +123,7 @@ export default function ScenarioPage() {
                 type="button"
                 onClick={() => handleStartScenario(s)}
                 disabled={creatingId != null}
-                className="card-elevated w-full rounded-xl border border-[var(--card-border)] bg-[var(--card)] p-4 text-left transition-colors active:bg-[var(--muted)] disabled:opacity-60"
+                className="card-elevated w-full glass-card p-4 text-left transition-colors active:bg-[var(--muted)] disabled:opacity-60"
               >
                 <div className="flex items-start gap-3">
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[var(--accent-2)]/30 bg-[var(--accent-2-muted)]">

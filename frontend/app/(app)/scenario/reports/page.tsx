@@ -31,7 +31,7 @@ export default function ScenarioReportsPage() {
   if (user.isSpouse !== true) return null
 
   return (
-    <div className="flex min-h-dvh flex-col bg-[var(--background)]">
+    <div className="flex min-h-dvh flex-col">
       <div className="border-b border-[var(--card-border)] bg-[var(--card)] px-6 pt-14 pb-4">
         <div className="flex items-center gap-3">
           <Link
@@ -57,7 +57,7 @@ export default function ScenarioReportsPage() {
             {[1, 2, 3].map((i) => (
               <div
                 key={i}
-                className="h-20 animate-pulse rounded-xl border border-[var(--card-border)] bg-[var(--card)]"
+                className="h-20 animate-pulse glass-card"
               />
             ))}
           </div>

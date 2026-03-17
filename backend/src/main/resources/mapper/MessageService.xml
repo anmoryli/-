@@ -16,6 +16,8 @@
             <if test="shareScope!=null">share_scope=#{shareScope},</if>
             <if test="userType!=null">user_type=#{userType},</if>
             <if test="dataCollectionEnabled!=null">data_collection_enabled=#{dataCollectionEnabled},</if>
+            <if test="communityEnabled!=null">community_enabled=#{communityEnabled},</if>
+            <if test="emailEnabled!=null">email_enabled=#{emailEnabled},</if>
         </set>
         where user_id=#{userId}
     </update>

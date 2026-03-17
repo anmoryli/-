@@ -61,7 +61,7 @@ public interface UserService {
 
     Integer getUserCountByTime(LocalDateTime start, LocalDateTime end);
 
-    User updateUserType(Integer userId, String userType);
+    User updateUserType(Integer userId, String userType, String defaultRelationship);
 
     /**
      * 管理员更新用户信息（仅允许修改 username、email、userType）
@@ -73,4 +73,16 @@ public interface UserService {
 
     /** 更新用户数据收集偏好 */
     void updateDataCollectionEnabled(Integer userId, boolean enabled);
+
+    /** 获取社区功能开关（默认关闭） */
+    Boolean getCommunityEnabled(Integer userId);
+
+    /** 更新社区功能开关 */
+    void updateCommunityEnabled(Integer userId, boolean enabled);
+
+    /** 获取邮箱消息开关（默认开启） */
+    Boolean getEmailEnabled(Integer userId);
+
+    /** 更新邮箱消息开关 */
+    void updateEmailEnabled(Integer userId, boolean enabled);
 }

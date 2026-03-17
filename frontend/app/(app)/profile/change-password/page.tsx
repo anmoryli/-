@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useBack } from "@/lib/use-back"
 import { ArrowLeft } from "lucide-react"
 import Link from "next/link"
 import { useAuth } from "@/lib/auth-context"
@@ -19,7 +19,7 @@ function maskEmail(email: string) {
 }
 
 export default function ChangePasswordPage() {
-  const router = useRouter()
+  const goBack = useBack("/profile/settings")
   const { user } = useAuth()
   const [mode, setMode] = useState<"old" | "code">("old")
   const [oldPassword, setOldPassword] = useState("")
@@ -105,11 +105,11 @@ export default function ChangePasswordPage() {
   if (!user) return null
 
   return (
-    <div className="min-h-dvh bg-background">
-      <div className="sticky top-0 z-10 flex items-center gap-3 bg-background/95 px-4 py-4 backdrop-blur-sm">
+    <div className="min-h-dvh">
+      <div className="sticky top-0 z-10 flex items-center gap-3 px-4 py-4" style={{ background: "rgba(255,255,255,0.45)", backdropFilter: "blur(24px) saturate(1.3)", WebkitBackdropFilter: "blur(24px) saturate(1.3)" }}>
         <button
           type="button"
-          onClick={() => router.back()}
+          onClick={goBack}
           className="flex h-9 w-9 items-center justify-center rounded-full bg-secondary transition-colors active:bg-secondary/80"
           aria-label="返回"
         >
@@ -119,7 +119,7 @@ export default function ChangePasswordPage() {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6 px-4 pt-6">
-        <div className="flex gap-4 rounded-lg border border-[var(--card-border)] bg-[var(--card)] p-2">
+        <div className="flex gap-4 glass-card p-2">
           <button
             type="button"
             onClick={() => setMode("old")}

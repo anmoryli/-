@@ -43,7 +43,7 @@ export function TrendChart({ userId }: TrendChartProps) {
   if (loading || data.length === 0) return null
 
   return (
-    <div className="card-elevated overflow-hidden rounded-xl p-4">
+    <div className="glass-card overflow-hidden rounded-xl p-4">
       <div className="mb-3 flex items-center gap-2">
         <TrendingUp className="h-4 w-4 text-[var(--accent-1)]" strokeWidth={1.75} />
         <p className="text-micro font-medium uppercase tracking-wider text-[var(--foreground-muted)]">
@@ -65,7 +65,7 @@ export function TrendChart({ userId }: TrendChartProps) {
                 const p = payload?.[0]?.payload
                 if (!p) return null
                 return (
-                  <div className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] px-3 py-2 text-xs shadow-lg">
+                  <div className="rounded-lg border border-[var(--card-border)] bg-[var(--card-solid)] px-3 py-2 text-xs shadow-lg">
                     <p className="font-medium">
                       {format(new Date(p.date), "M月d日", { locale: zhCN })}
                     </p>

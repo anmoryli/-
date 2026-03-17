@@ -53,6 +53,7 @@ public class MentionMailServiceImpl implements MentionMailService {
 
             User member = userService.getById(memberUserId);
             if (member == null || member.getEmail() == null || member.getEmail().isBlank()) continue;
+            if (Boolean.FALSE.equals(member.getEmailEnabled())) continue;
 
             try {
                 String subject = "孕期宝：有人在新记录中提到了你";
@@ -90,6 +91,7 @@ public class MentionMailServiceImpl implements MentionMailService {
                 for (Integer spouseId : spouseIds) {
                     User spouse = userService.getById(spouseId);
                     if (spouse == null || spouse.getEmail() == null || spouse.getEmail().isBlank()) continue;
+                    if (Boolean.FALSE.equals(spouse.getEmailEnabled())) continue;
                     try {
                         String subject = "孕期宝：准妈妈有新记录";
                         String snippet = contentSnippet != null && contentSnippet.length() > 80 ? contentSnippet.substring(0, 80) + "…" : (contentSnippet != null ? contentSnippet : "");
@@ -122,6 +124,7 @@ public class MentionMailServiceImpl implements MentionMailService {
         } else {
             User creator = userService.getById(family.getCreatorUserId());
             if (creator != null && creator.getEmail() != null && !creator.getEmail().isBlank()) {
+                if (Boolean.FALSE.equals(creator.getEmailEnabled())) return;
                 try {
                     String subject = "孕期宝：准爸爸有新记录";
                     String snippet = contentSnippet != null && contentSnippet.length() > 80 ? contentSnippet.substring(0, 80) + "…" : (contentSnippet != null ? contentSnippet : "");

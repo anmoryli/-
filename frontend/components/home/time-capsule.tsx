@@ -62,7 +62,7 @@ export function TimeCapsule({ records, userId }: TimeCapsuleProps) {
     <section>
       <Link
         href={`/records/${capsule.id}`}
-        className="card-elevated block overflow-hidden rounded-xl transition-opacity active:opacity-90"
+        className="glass-card block overflow-hidden rounded-xl transition-opacity active:opacity-90"
       >
         <div className="flex items-center gap-3 px-4 pt-3 pb-2">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/15 text-amber-600 dark:bg-amber-400/20 dark:text-amber-400">

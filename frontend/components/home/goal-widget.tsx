@@ -29,7 +29,7 @@ export function GoalWidget({ userId }: GoalWidgetProps) {
   return (
     <Link
       href="/goals"
-      className="card-elevated block overflow-hidden rounded-xl transition-opacity active:opacity-90"
+      className="glass-card block overflow-hidden rounded-xl transition-opacity active:opacity-90"
     >
       <div className="flex items-center gap-3 px-4 py-3">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-1-muted)] text-[var(--accent-1)]">

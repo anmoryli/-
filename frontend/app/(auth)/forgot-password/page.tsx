@@ -108,7 +108,7 @@ export default function ForgotPasswordPage() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             autoComplete="email"
-            className="rounded-lg border-[var(--card-border)] bg-[var(--card)]"
+            className="rounded-lg border-[var(--card-border)] bg-[var(--card-solid)]"
           />
         </div>
         <div className="space-y-2">
@@ -120,7 +120,7 @@ export default function ForgotPasswordPage() {
               placeholder="6 位验证码"
               value={code}
               onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
-              className="flex-1 rounded-lg border-[var(--card-border)] bg-[var(--card)]"
+              className="flex-1 rounded-lg border-[var(--card-border)] bg-[var(--card-solid)]"
             />
             <Button
               type="button"
@@ -142,7 +142,7 @@ export default function ForgotPasswordPage() {
             value={newPassword}
             onChange={(e) => setNewPassword(e.target.value)}
             autoComplete="new-password"
-            className="rounded-lg border-[var(--card-border)] bg-[var(--card)]"
+            className="rounded-lg border-[var(--card-border)] bg-[var(--card-solid)]"
           />
         </div>
         <div className="space-y-2">
@@ -154,7 +154,7 @@ export default function ForgotPasswordPage() {
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
             autoComplete="new-password"
-            className="rounded-lg border-[var(--card-border)] bg-[var(--card)]"
+            className="rounded-lg border-[var(--card-border)] bg-[var(--card-solid)]"
           />
         </div>
         <Button

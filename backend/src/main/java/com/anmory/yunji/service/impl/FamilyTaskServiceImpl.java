@@ -122,7 +122,7 @@ public class FamilyTaskServiceImpl implements FamilyTaskService {
                         : "快去夸夸他吧～";
                 userNotificationService.notifySystem(creatorUserId, title, body);
                 User mom = userService.getById(creatorUserId);
-                if (mom != null && mom.getEmail() != null && !mom.getEmail().isBlank()) {
+                if (mom != null && mom.getEmail() != null && !mom.getEmail().isBlank() && !Boolean.FALSE.equals(mom.getEmailEnabled())) {
                     String mailBody = String.format(
                             "你好，%s\n\n老公完成了「%s」任务，快去夸夸他吧～\n\n—— 孕期宝 · 爸爸成长营",
                             mom.getUsername(),
@@ -155,7 +155,7 @@ public class FamilyTaskServiceImpl implements FamilyTaskService {
         familyTaskMapper.insert(t);
         userNotificationService.notifyTaskAssigned(assigneeUserId, t.getId(), "新任务：" + t.getTitle(), t.getDescription());
         User assignee = userService.getById(assigneeUserId);
-        if (assignee != null && assignee.getEmail() != null && !assignee.getEmail().isBlank()) {
+        if (assignee != null && assignee.getEmail() != null && !assignee.getEmail().isBlank() && !Boolean.FALSE.equals(assignee.getEmailEnabled())) {
             try {
                 String subject = "孕期宝 · 爸爸成长营：新任务提醒";
                 String body = String.format(

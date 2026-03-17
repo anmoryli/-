@@ -81,6 +81,10 @@ public class CheckReportServiceImpl implements CheckReportService {
                     checkReportMapper.updateSendStatus(report.getReportId(), false, "failed", report.getRetryCount() + 1);
                     continue;
                 }
+                if (Boolean.FALSE.equals(user.getEmailEnabled())) {
+                    checkReportMapper.updateSendStatus(report.getReportId(), false, "disabled", report.getRetryCount());
+                    continue;
+                }
                 String subject = "孕期检查提醒";
                 String content = buildMailContent(report);
                 String htmlBody = MailServiceImpl.wrapHtmlBodyWithStyle(MailServiceImpl.textToHtmlParagraphs(content));

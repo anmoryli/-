@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import { useBack } from "@/lib/use-back"
 import { ArrowLeft } from "lucide-react"
 import { createArticle, type AdminArticle } from "@/lib/api/admin"
 import { Button } from "@/components/ui/button"
@@ -12,6 +13,7 @@ import { toast } from "sonner"
 
 export default function AdminArticleNewPage() {
   const router = useRouter()
+  const goBack = useBack("/admin")
   const [title, setTitle] = useState("")
   const [summary, setSummary] = useState("")
   const [content, setContent] = useState("")
@@ -48,11 +50,11 @@ export default function AdminArticleNewPage() {
   }
 
   return (
-    <div className="flex min-h-dvh flex-col bg-[var(--background)]">
-      <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-[var(--card-border)] bg-[var(--background)] px-4 py-4">
+    <div className="flex min-h-dvh flex-col">
+      <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-white/40 px-4 py-4" style={{ background: "rgba(255,255,255,0.45)", backdropFilter: "blur(24px) saturate(1.3)", WebkitBackdropFilter: "blur(24px) saturate(1.3)" }}>
         <button
           type="button"
-          onClick={() => router.back()}
+          onClick={() => goBack()}
           className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--muted)]"
         >
           <ArrowLeft className="h-5 w-5" />
@@ -140,7 +142,7 @@ export default function AdminArticleNewPage() {
           />
         </div>
         <div className="mt-6 flex gap-3">
-          <Button type="button" variant="outline" onClick={() => router.back()}>
+          <Button type="button" variant="outline" onClick={() => goBack()}>
             取消
           </Button>
           <Button type="submit" disabled={saving}>

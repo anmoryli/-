@@ -1,15 +1,16 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter, useParams } from "next/navigation"
+import { useParams } from "next/navigation"
+import { useBack } from "@/lib/use-back"
 import { ArrowLeft } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import { getArticle, type Article } from "@/lib/api/article"
 import { MarkdownView } from "@/components/markdown-view"
 
 export default function ArticleDetailPage() {
-  const router = useRouter()
   const params = useParams()
+  const goBack = useBack("/articles")
   const { user } = useAuth()
   const [article, setArticle] = useState<Article | null>(null)
   const [loading, setLoading] = useState(true)
@@ -30,10 +31,10 @@ export default function ArticleDetailPage() {
   if (!user) return null
 
   return (
-    <div className="min-h-dvh bg-[var(--background)]">
+    <div className="min-h-dvh">
       <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-[var(--card-border)] bg-[var(--card)]/98 px-4 py-4 backdrop-blur-sm">
         <button
-          onClick={() => router.back()}
+          onClick={() => goBack()}
           className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--muted)] transition-colors active:bg-[var(--card)]"
         >
           <ArrowLeft className="h-5 w-5" />

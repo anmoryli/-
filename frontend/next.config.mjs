@@ -12,6 +12,22 @@ const nextConfig = {
   experimental: {
     proxyClientMaxBodySize: "500mb",
   },
+  async headers() {
+    return [
+      {
+        source: "/_next/static/:path*",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
+        ],
+      },
+      {
+        source: "/images/:path*",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=86400, stale-while-revalidate=604800" },
+        ],
+      },
+    ]
+  },
   // 代理到后端，避免浏览器直连 9677 时的 CORS
   async rewrites() {
     return [

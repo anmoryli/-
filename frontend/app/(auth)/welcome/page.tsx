@@ -158,7 +158,7 @@ export default function WelcomePage() {
   const isLast = step === totalSteps - 1
 
   return (
-    <div className="flex min-h-dvh flex-col bg-[var(--background)]">
+    <div className="flex min-h-dvh flex-col">
       <div className="flex flex-1 flex-col items-center justify-center px-8 pb-8 pt-12">
         {step < slides.length ? (
           <>

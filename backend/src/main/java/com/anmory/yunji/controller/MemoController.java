@@ -722,9 +722,15 @@ public class MemoController {
                 byte[] pdfBytes = baos.toByteArray();
                 String pdfUrl = aliOssUtil.uploadExportPdf(userId, pdfBytes);
                 try {
-                    String textBody = "您的孕期记录 PDF 已生成。\n\n下载链接：\n" + pdfUrl + "\n\n链接 7 天内有效，请及时保存。";
-                    mailService.sendTextMail(to, "您的孕期记录 PDF 已生成", textBody);
-                    log.info("[导出] PDF 已上传 OSS 并发送邮件链接 userId={} to={} url={}", userId, to, pdfUrl);
+                    if (Boolean.FALSE.equals(user.getEmailEnabled())) {
+                        userNotificationService.notifySystem(userId, "导出完成（邮件未发送）",
+                                "孕期记录 PDF 已生成。你已关闭邮箱消息接收，请复制以下链接下载（7 天内有效）：\n\n" + pdfUrl);
+                        log.info("[导出] 用户关闭邮件接收，改为站内通知 userId={} url={}", userId, pdfUrl);
+                    } else {
+                        String textBody = "您的孕期记录 PDF 已生成。\n\n下载链接：\n" + pdfUrl + "\n\n链接 7 天内有效，请及时保存。";
+                        mailService.sendTextMail(to, "您的孕期记录 PDF 已生成", textBody);
+                        log.info("[导出] PDF 已上传 OSS 并发送邮件链接 userId={} to={} url={}", userId, to, pdfUrl);
+                    }
                 } catch (Exception mailEx) {
                     log.warn("[导出] 邮件发送失败，已通过站内通知下发链接 userId={} url={}", userId, pdfUrl, mailEx);
                     userNotificationService.notifySystem(userId, "导出完成（邮件未发出）",

@@ -6,8 +6,10 @@ import com.anmory.yunji.dto.SpouseEmotionSummaryDto;
 import com.anmory.yunji.entity.Family;
 import com.anmory.yunji.entity.Memo;
 import com.anmory.yunji.entity.User;
+import com.anmory.yunji.entity.MoodRecord;
 import com.anmory.yunji.entity.UserDailyLog;
 import com.anmory.yunji.mapper.MemoMapper;
+import com.anmory.yunji.mapper.MoodRecordMapper;
 import com.anmory.yunji.mapper.UserDailyLogMapper;
 import com.anmory.yunji.service.EmotionPregnancyService;
 import com.anmory.yunji.service.FamilyService;
@@ -36,6 +38,7 @@ public class EmotionPregnancyServiceImpl implements EmotionPregnancyService {
 
     private final MemoMapper memoMapper;
     private final UserDailyLogMapper userDailyLogMapper;
+    private final MoodRecordMapper moodRecordMapper;
     private final UserService userService;
     private final FamilyService familyService;
     private final PromptService promptService;
@@ -82,6 +85,16 @@ public class EmotionPregnancyServiceImpl implements EmotionPregnancyService {
                 int weekIdx = PregnancyWeekUtil.getWeekIndex(lmdFinal, log.getRecordDate());
                 if (weekIdx < 0 || weekIdx > 52) continue;
                 byWeek.computeIfAbsent(weekIdx, k -> new WeekAccumulator(k, lmdFinal)).addDailyLog(log);
+            }
+        }
+        // 3) MoodRecord: 心情多次记录，供 AI 分析
+        List<MoodRecord> moodRecords = moodRecordMapper.findByUserAndDateRange(creatorUserId, start, end);
+        if (moodRecords != null) {
+            for (MoodRecord mr : moodRecords) {
+                if (mr.getRecordDate() == null) continue;
+                int weekIdx = PregnancyWeekUtil.getWeekIndex(lmdFinal, mr.getRecordDate());
+                if (weekIdx < 0 || weekIdx > 52) continue;
+                byWeek.computeIfAbsent(weekIdx, k -> new WeekAccumulator(k, lmdFinal)).addMoodRecord(mr);
             }
         }
 
@@ -228,6 +241,19 @@ public class EmotionPregnancyServiceImpl implements EmotionPregnancyService {
             case "tired" -> "疲惫";
             case "anxious" -> "焦虑";
             case "peaceful" -> "安心";
+            case "excited" -> "兴奋";
+            case "grateful" -> "感恩";
+            case "sleepy" -> "困倦";
+            case "energetic" -> "精力充沛";
+            case "sad" -> "难过";
+            case "worried" -> "担忧";
+            case "relaxed" -> "放松";
+            case "stressed" -> "紧张";
+            case "nervous" -> "忐忑";
+            case "joyful" -> "喜悦";
+            case "content" -> "满足";
+            case "irritable" -> "烦躁";
+            case "expectant" -> "期待";
             default -> key;
         };
     }
@@ -266,6 +292,12 @@ public class EmotionPregnancyServiceImpl implements EmotionPregnancyService {
             }
         }
 
+        void addMoodRecord(MoodRecord mr) {
+            if (mr.getMood() != null && !mr.getMood().isBlank()) {
+                moodCount.merge(mr.getMood().trim().toLowerCase(), 1, Integer::sum);
+            }
+        }
+
         EmotionWeekDto toDto() {
             EmotionWeekDto dto = new EmotionWeekDto();
             dto.setPregnancyWeekIndex(weekIndex);
@@ -291,23 +323,30 @@ public class EmotionPregnancyServiceImpl implements EmotionPregnancyService {
         List<String> parts = new ArrayList<>();
         parts.add("上周记录" + memoCount + "条");
         List<UserDailyLog> logs = userDailyLogMapper.findByUserAndDateRange(userId, start, end);
+        Map<String, Integer> moodCounts = new HashMap<>();
         if (logs != null && !logs.isEmpty()) {
             long withWeight = logs.stream().filter(l -> l.getWeightKg() != null && l.getWeightKg() > 0).count();
             if (withWeight > 0) parts.add("体重有记录");
-            Map<String, Integer> moodCounts = new HashMap<>();
             for (UserDailyLog log : logs) {
                 if (log.getMood() != null && !log.getMood().isBlank()) {
                     moodCounts.merge(log.getMood().toLowerCase(), 1, Integer::sum);
                 }
             }
-            if (!moodCounts.isEmpty()) {
-                String topMood = moodCounts.entrySet().stream()
-                        .max(Map.Entry.comparingByValue())
-                        .map(Map.Entry::getKey).orElse(null);
-                if (topMood != null) {
-                    String moodLabel = "happy".equals(topMood) ? "开心" : "calm".equals(topMood) ? "平静" : "tired".equals(topMood) ? "疲惫" : "anxious".equals(topMood) ? "焦虑" : "peaceful".equals(topMood) ? "平和" : topMood;
-                    parts.add("心情以" + moodLabel + "为主");
+        }
+        List<MoodRecord> moodRecords = moodRecordMapper.findByUserAndDateRange(userId, start, end);
+        if (moodRecords != null) {
+            for (MoodRecord mr : moodRecords) {
+                if (mr.getMood() != null && !mr.getMood().isBlank()) {
+                    moodCounts.merge(mr.getMood().toLowerCase(), 1, Integer::sum);
                 }
+            }
+        }
+        if (!moodCounts.isEmpty()) {
+            String topMood = moodCounts.entrySet().stream()
+                    .max(Map.Entry.comparingByValue())
+                    .map(Map.Entry::getKey).orElse(null);
+            if (topMood != null) {
+                parts.add("心情以" + moodLabel(topMood) + "为主");
             }
         }
         return String.join("，", parts);
