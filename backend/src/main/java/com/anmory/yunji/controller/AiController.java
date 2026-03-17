@@ -104,9 +104,15 @@ public class AiController {
     @Value("${spring.ai.openai.api-key}")
     private String aiApiKey;
 
+    /** 万相图生图 API Key，从环境变量 DASHSCOPE_API_KEY 读取 */
+    @Value("${dashscope.api-key:}")
+    private String dashscopeApiKey;
+
     private static final Pattern DATA_IMAGE_PATTERN = Pattern.compile("data:image/([a-zA-Z0-9.+-]+);base64,([A-Za-z0-9+/=]+)");
     private static final String MODEL_TEXT_CHAT = "gpt-5.2";
     private static final String MODEL_IMAGE = "gemini-3.1-flash-image-preview";
+    /** 万相 2.6 图像编辑（支持 1～4 张参考图）同步调用地址 */
+    private static final String WANX_IMAGE_EDIT_URL = "https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation";
 
     /**
      * 配偶提及关键词（用户输入包含则触发邮件通知），与 FamilyServiceImpl.SPOUSE_KEYWORDS 保持一致
@@ -369,26 +375,30 @@ public class AiController {
             }
 
             if (!isScenario && hasImages && intent == ChatIntent.IMAGE_TO_IMAGE) {
-                String imageUrl = generateImageFromImage(userId, safeQuestion, imageUrls.get(0));
+                String imageUrl = generateImageFromImage(userId, safeQuestion, imageUrls);
                 String answer = "这是我基于你上传图片生成的变体：\n\n![AI生成图片](" + imageUrl + ")";
-                boolean insertPost = publishToCommunity;
+                boolean isPublic = publishToCommunity;
                 if (publishToCommunity) {
                     User currentUser = userService.getById(userId);
                     if (Boolean.TRUE.equals(currentUser != null ? currentUser.getIsSpouse() : null)) {
                         answer += "\n\n（配偶不可公开到社区，作品已保存为仅自己可见。）";
-                        publishToCommunity = false;
+                        isPublic = false;
                     }
                 }
-                if (insertPost) {
-                    AiGenerationPost post = new AiGenerationPost();
-                    post.setUserId(userId);
-                    post.setTemplateId(null);
-                    post.setInputImageUrl(imageUrls.get(0));
-                    post.setOutputImageUrl(imageUrl);
-                    post.setPromptText(safeQuestion == null || safeQuestion.isBlank() ? "图生图生成" : safeQuestion);
-                    post.setIsPublic(publishToCommunity);
-                    aiGenerationPostMapper.insert(post);
+                // 图生图始终写入一条作品记录，便于在「我的作品」中查看
+                AiGenerationPost post = new AiGenerationPost();
+                post.setUserId(userId);
+                post.setTemplateId(null);
+                post.setInputImageUrl(imageUrls.isEmpty() ? null : imageUrls.get(0));
+                try {
+                    post.setInputImageUrls(imageUrls.isEmpty() ? null : objectMapper.writeValueAsString(imageUrls));
+                } catch (Exception ignored) {
+                    post.setInputImageUrls(null);
                 }
+                post.setOutputImageUrl(imageUrl);
+                post.setPromptText(safeQuestion == null || safeQuestion.isBlank() ? "图生图生成" : safeQuestion);
+                post.setIsPublic(isPublic);
+                aiGenerationPostMapper.insert(post);
                 messageService.save(conversationId, userId, answer, true);
                 conversationService.setUnreadAi(conversationId);
                 emitter.send(SseEmitter.event().data(answer));
@@ -1174,10 +1184,31 @@ public class AiController {
         return extractAndUploadGeneratedImage(userId, contentText);
     }
 
-    private String generateImageFromImage(Integer userId, String question, String imageUrl) throws Exception {
+    /**
+     * 图生图：单图用 Gemini（MODEL_IMAGE），多图用万相 wan2.6-image。
+     * 单图不依赖 DASHSCOPE_API_KEY；多图需配置 DASHSCOPE_API_KEY。
+     */
+    private String generateImageFromImage(Integer userId, String question, List<String> imageUrls) throws Exception {
+        if (imageUrls == null || imageUrls.isEmpty()) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR.code(), ErrorCode.VALIDATION_ERROR.key(), "图生图至少需要 1 张参考图");
+        }
         String prompt = (question == null || question.isBlank())
-                ? "基于这张图片生成一个风格柔和、细节清晰的高质量变体。"
-                : question;
+                ? "参考以上图片的风格与内容，生成一张风格柔和、细节清晰的高质量图像。"
+                : question.trim();
+        if (imageUrls.size() == 1) {
+            return generateImageFromImageGemini(userId, prompt, imageUrls.get(0));
+        }
+        if (dashscopeApiKey == null || dashscopeApiKey.isBlank()) {
+            throw new BusinessException(ErrorCode.AI_SERVICE_ERROR.code(), ErrorCode.AI_SERVICE_ERROR.key(), "多图图生图需配置 DASHSCOPE_API_KEY");
+        }
+        List<String> images = imageUrls.size() > 4 ? imageUrls.subList(0, 4) : imageUrls;
+        String generatedImageUrl = callWanxImageEdit(prompt, images);
+        byte[] bytes = downloadImageToBytes(generatedImageUrl);
+        return aliOssUtil.uploadChatImage(userId, bytes, "png");
+    }
+
+    /** 单图图生图：走 Gemini（MODEL_IMAGE），不依赖万相 API Key */
+    private String generateImageFromImageGemini(Integer userId, String prompt, String imageUrl) throws Exception {
         ObjectNode body = objectMapper.createObjectNode();
         body.put("model", MODEL_IMAGE);
         ArrayNode messages = body.putArray("messages");
@@ -1185,11 +1216,95 @@ public class AiController {
         user.put("role", "user");
         ArrayNode content = user.putArray("content");
         content.addObject().put("type", "text").put("text", prompt);
-        ObjectNode imagePart = content.addObject();
-        imagePart.put("type", "image_url");
-        imagePart.putObject("image_url").put("url", imageUrl);
+        content.addObject().put("type", "image_url").putObject("image_url").put("url", imageUrl);
         String contentText = callAiChatCompletions(body);
         return extractAndUploadGeneratedImage(userId, contentText);
+    }
+
+    /**
+     * 调用万相 wan2.6-image 图像编辑同步接口，请求体格式见阿里云文档。
+     * 返回生成结果中第一张图片的 URL（有效期 24 小时，调用方需及时下载并转存）。
+     */
+    private String callWanxImageEdit(String prompt, List<String> imageUrls) throws Exception {
+        log.info("[万相生图被调用，多图生成一张图]");
+        ObjectNode input = objectMapper.createObjectNode();
+        ArrayNode messages = input.putArray("messages");
+        ObjectNode userMsg = messages.addObject();
+        userMsg.put("role", "user");
+        ArrayNode content = userMsg.putArray("content");
+        content.addObject().put("text", prompt);
+        for (String url : imageUrls) {
+            if (url != null && !url.isBlank()) {
+                content.addObject().put("image", url);
+            }
+        }
+        ObjectNode body = objectMapper.createObjectNode();
+        body.put("model", "wan2.6-image");
+        body.set("input", input);
+        ObjectNode parameters = objectMapper.createObjectNode();
+        parameters.put("prompt_extend", true);
+        parameters.put("watermark", false);
+        parameters.put("n", 1);
+        parameters.put("enable_interleave", false);
+        parameters.put("size", "1K");
+        body.set("parameters", parameters);
+
+        String payload = objectMapper.writeValueAsString(body);
+        RequestBody requestBody = RequestBody.create(payload, okhttp3.MediaType.parse("application/json; charset=utf-8"));
+        OkHttpClient client = new OkHttpClient.Builder()
+                .connectTimeout(30, TimeUnit.SECONDS)
+                .readTimeout(120, TimeUnit.SECONDS)
+                .writeTimeout(60, TimeUnit.SECONDS)
+                .build();
+        Request request = new Request.Builder()
+                .url(WANX_IMAGE_EDIT_URL)
+                .post(requestBody)
+                .addHeader("Authorization", "Bearer " + dashscopeApiKey.trim())
+                .addHeader("Content-Type", "application/json; charset=utf-8")
+                .build();
+        try (Response response = client.newCall(request).execute()) {
+            String bodyText = response.body() != null ? response.body().string() : "";
+            if (!response.isSuccessful()) {
+                log.warn("[万相图生图] 请求失败 code={} body={}", response.code(), bodyText);
+                throw new BusinessException(ErrorCode.AI_SERVICE_ERROR.code(), ErrorCode.AI_SERVICE_ERROR.key(), "图生图服务暂时不可用，请稍后重试");
+            }
+            JsonNode root = objectMapper.readTree(bodyText);
+            JsonNode code = root.path("code");
+            if (!code.isMissingNode() && !code.asText().isBlank()) {
+                String msg = root.path("message").asText("未知错误");
+                log.warn("[万相图生图] 业务错误 code={} message={}", code.asText(), msg);
+                throw new BusinessException(ErrorCode.AI_SERVICE_ERROR.code(), ErrorCode.AI_SERVICE_ERROR.key(), msg);
+            }
+            JsonNode choices = root.path("output").path("choices");
+            if (!choices.isArray() || choices.isEmpty()) {
+                throw new BusinessException(ErrorCode.AI_SERVICE_ERROR.code(), ErrorCode.AI_SERVICE_ERROR.key(), "图生图返回为空，请稍后重试");
+            }
+            JsonNode firstChoice = choices.get(0);
+            JsonNode msgContent = firstChoice.path("message").path("content");
+            if (!msgContent.isArray()) {
+                throw new BusinessException(ErrorCode.AI_SERVICE_ERROR.code(), ErrorCode.AI_SERVICE_ERROR.key(), "图生图返回格式异常，请稍后重试");
+            }
+            for (JsonNode item : msgContent) {
+                if ("image".equals(item.path("type").asText(null)) && item.has("image")) {
+                    return item.path("image").asText();
+                }
+            }
+            throw new BusinessException(ErrorCode.AI_SERVICE_ERROR.code(), ErrorCode.AI_SERVICE_ERROR.key(), "未获取到生成图片，请稍后重试");
+        }
+    }
+
+    private byte[] downloadImageToBytes(String imageUrl) throws IOException {
+        OkHttpClient client = new OkHttpClient.Builder()
+                .connectTimeout(15, TimeUnit.SECONDS)
+                .readTimeout(60, TimeUnit.SECONDS)
+                .build();
+        Request request = new Request.Builder().url(imageUrl).get().build();
+        try (Response response = client.newCall(request).execute()) {
+            if (!response.isSuccessful() || response.body() == null) {
+                throw new IOException("下载图片失败: " + response.code());
+            }
+            return response.body().bytes();
+        }
     }
 
     private String analyzeImage(String imageUrl, String userQuestion) throws Exception {
@@ -1367,7 +1482,7 @@ public class AiController {
 
         String inputImageUrl = aliOssUtil.uploadChatImage(userId, image);
         String finalPrompt = buildCommunityPrompt(templateId, prompt);
-        String outputImageUrl = generateImageFromImage(userId, finalPrompt, inputImageUrl);
+        String outputImageUrl = generateImageFromImage(userId, finalPrompt, List.of(inputImageUrl));
 
         Integer savedTemplateId = templateId;
         if (savedTemplateId == null && templateTitle != null && !templateTitle.isBlank()) {
@@ -1388,6 +1503,11 @@ public class AiController {
         post.setUserId(userId);
         post.setTemplateId(savedTemplateId);
         post.setInputImageUrl(inputImageUrl);
+        try {
+            post.setInputImageUrls(objectMapper.writeValueAsString(List.of(inputImageUrl)));
+        } catch (Exception ignored) {
+            post.setInputImageUrls(null);
+        }
         post.setOutputImageUrl(outputImageUrl);
         post.setPromptText(finalPrompt);
         post.setIsPublic(publishPost);

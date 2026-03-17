@@ -13,8 +13,8 @@ import java.util.List;
 @Mapper
 public interface AiGenerationPostMapper {
 
-    @Insert("INSERT INTO ai_generation_post(user_id, template_id, input_image_url, output_image_url, prompt_text, is_public, created_at, updated_at) " +
-            "VALUES(#{userId}, #{templateId}, #{inputImageUrl}, #{outputImageUrl}, #{promptText}, #{isPublic}, NOW(), NOW())")
+    @Insert("INSERT INTO ai_generation_post(user_id, template_id, input_image_url, input_image_urls, output_image_url, prompt_text, is_public, created_at, updated_at) " +
+            "VALUES(#{userId}, #{templateId}, #{inputImageUrl}, #{inputImageUrls}, #{outputImageUrl}, #{promptText}, #{isPublic}, NOW(), NOW())")
     @Options(useGeneratedKeys = true, keyProperty = "postId")
     int insert(AiGenerationPost post);
 

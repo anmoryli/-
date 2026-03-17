@@ -666,8 +666,8 @@ export default function RecordsPage() {
               const sortedMom = [...momItems].sort(sortByTimeDesc)
 
               const renderCard = (record: MemoItem) => (
-                <div key={record.id} className="group relative w-full overflow-hidden rounded-lg bg-transparent min-h-[52px]">
-                  <Link href={`/records/${record.id}`} className="flex min-w-0 gap-2 p-2">
+                <div key={record.id} className="group flex w-full min-h-[52px] items-stretch overflow-hidden rounded-lg bg-transparent">
+                  <Link href={`/records/${record.id}`} className="flex min-w-0 flex-1 gap-2 p-2 pr-0">
                     <RecordTypeIcon type={record.type} tag={record.tag} />
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap gap-1">
@@ -713,11 +713,11 @@ export default function RecordsPage() {
                     </div>
                   </Link>
                   {(!isFamilyMember || (user?.isSpouse && record.recordBy === "dad")) && (
-                    <>
+                    <div className="flex shrink-0 flex-col items-center justify-start gap-0.5 py-2 pr-2 pl-1">
                       <button
                         type="button"
                         onClick={(e) => { e.preventDefault(); router.push(`/records/${record.id}/edit`) }}
-                        className="absolute right-11 top-1.5 flex h-6 w-6 items-center justify-center rounded-md bg-transparent text-[var(--foreground-muted)] active:opacity-80"
+                        className="flex h-7 w-7 items-center justify-center rounded-md text-[var(--foreground-muted)] hover:bg-[var(--muted)] active:opacity-80"
                         aria-label="编辑"
                       >
                         <Pencil className="h-3.5 w-3.5" strokeWidth={1.75} />
@@ -726,7 +726,8 @@ export default function RecordsPage() {
                         <AlertDialogTrigger asChild>
                           <button
                             type="button"
-                            className="absolute right-1 top-1.5 flex h-6 w-6 items-center justify-center rounded-md bg-transparent text-[var(--foreground-muted)] hover:bg-[var(--critical-muted)] hover:text-[var(--critical)]"
+                            className="flex h-7 w-7 items-center justify-center rounded-md text-[var(--foreground-muted)] hover:bg-[var(--critical-muted)] hover:text-[var(--critical)]"
+                            aria-label="删除"
                           >
                             <Trash2 className="h-3.5 w-3.5" strokeWidth={1.75} />
                           </button>
@@ -744,7 +745,7 @@ export default function RecordsPage() {
                           </AlertDialogFooter>
                         </AlertDialogContent>
                       </AlertDialog>
-                    </>
+                    </div>
                   )}
                 </div>
               )

@@ -1,8 +1,10 @@
 "use client"
 
+import { useState, useCallback } from "react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import remarkBreaks from "remark-breaks"
+import { Download, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 /** 判断是否为图片 URL（用于 RAG 返回的链接：图片渲染为 img，文件渲染为可点击文字链接） */
@@ -66,6 +68,23 @@ export function MarkdownView({
   className?: string
   stableKey?: string
 }) {
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+
+  const handleSaveImage = useCallback(async (url: string) => {
+    try {
+      const res = await fetch(url, { mode: "cors" })
+      const blob = await res.blob()
+      const ext = url.includes(".png") ? "png" : url.includes(".webp") ? "webp" : "jpg"
+      const a = document.createElement("a")
+      a.href = URL.createObjectURL(blob)
+      a.download = `AI生成图_${Date.now()}.${ext}`
+      a.click()
+      URL.revokeObjectURL(a.href)
+    } catch {
+      window.open(url, "_blank")
+    }
+  }, [])
+
   if (!content?.trim()) return null
   const normalizedContent = ensureImageUrlsAsMarkdown(content)
   return (
@@ -79,13 +98,19 @@ export function MarkdownView({
             if (isImageUrl(url)) {
               return (
                 <span className="block my-2">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={url}
-                    alt={typeof children === "string" ? children : "图片"}
-                    className="rounded-lg max-w-full max-h-[360px] w-auto h-auto object-contain"
-                    referrerPolicy="no-referrer"
-                  />
+                  <button
+                    type="button"
+                    onClick={() => setPreviewUrl(url)}
+                    className="block cursor-zoom-in text-left"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={url}
+                      alt={typeof children === "string" ? children : "图片"}
+                      className="rounded-lg max-w-full max-h-[360px] w-auto h-auto object-contain"
+                      referrerPolicy="no-referrer"
+                    />
+                  </button>
                 </span>
               )
             }
@@ -101,22 +126,62 @@ export function MarkdownView({
               </a>
             )
           },
-          img: ({ src, alt }) => {
+          img: ({ src, alt: altText }) => {
             const safeSrc = typeof src === "string" && src.trim() ? src : null
             if (!safeSrc) return null
             return (
-              <img
-                src={safeSrc}
-                alt={alt ?? ""}
-                className="rounded-lg max-w-full max-h-[360px] w-auto h-auto object-contain"
-                referrerPolicy="no-referrer"
-              />
+              <span className="block my-2">
+                <button
+                  type="button"
+                  onClick={() => setPreviewUrl(safeSrc)}
+                  className="block cursor-zoom-in text-left"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={safeSrc}
+                    alt={altText ?? ""}
+                    className="rounded-lg max-w-full max-h-[360px] w-auto h-auto object-contain"
+                    referrerPolicy="no-referrer"
+                  />
+                </button>
+              </span>
             )
           },
         }}
       >
         {normalizedContent}
       </ReactMarkdown>
+
+      {previewUrl && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+          onClick={() => setPreviewUrl(null)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="图片预览"
+        >
+          <div className="relative max-h-[90vh] max-w-[95vw]" onClick={(e) => e.stopPropagation()}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={previewUrl} alt="预览" className="max-h-[85vh] max-w-full rounded-lg object-contain" referrerPolicy="no-referrer" />
+            <div className="mt-3 flex justify-center gap-3">
+              <button
+                type="button"
+                onClick={() => handleSaveImage(previewUrl)}
+                className="flex items-center gap-2 rounded-xl bg-[var(--accent-1)] px-4 py-2 text-sm font-medium text-white"
+              >
+                <Download className="h-4 w-4" /> 保存图片
+              </button>
+              <button
+                type="button"
+                onClick={() => setPreviewUrl(null)}
+                className="flex items-center gap-2 rounded-xl border border-[var(--card-border)] bg-[var(--card)] px-4 py-2 text-sm"
+              >
+                <X className="h-4 w-4" /> 关闭
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -7,6 +7,7 @@ import { toast } from "sonner"
 import { useAuth } from "@/lib/auth-context"
 import {
   getAllEnriched,
+  getFamilyEnriched,
   updateFile,
   updatePhoto,
   updateText,
@@ -55,12 +56,16 @@ export default function EditRecordPage() {
       if (!user || !id) return
       setLoading(true)
       try {
-        let targetUserId = user.userId
-        if (user.userType === "family_member") {
-          const family = await getMyFamily(user.userId)
-          targetUserId = family?.creatorUserId ?? user.userId
+        let list: MemoItem[]
+        const family = await getMyFamily(user.userId)
+        const members = family ? await getFamilyMembers(family.familyId, user.userId) : []
+        const hasSpouse = (members ?? []).some((m) => m.isSpouse)
+        if (family && hasSpouse) {
+          list = await getFamilyEnriched(user.userId)
+        } else {
+          const targetUserId = user.userType === "family_member" ? (family?.creatorUserId ?? user.userId) : user.userId
+          list = await getAllEnriched(targetUserId, user.userId)
         }
-        const list = await getAllEnriched(targetUserId, user.userId)
         const found = list.find((r) => String(r.id) === id) || null
         setRecord(found)
         if (found) {

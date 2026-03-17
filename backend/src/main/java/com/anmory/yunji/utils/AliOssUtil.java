@@ -7,11 +7,7 @@ import com.aliyun.oss.OSSException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.multipart.MultipartFile;
 
-import javax.imageio.ImageIO;
-import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
 import java.util.UUID;
 
 @Slf4j
@@ -152,11 +148,10 @@ public class AliOssUtil {
 
             byte[] imageBytes = file.getBytes();
 
-            // 检查是否为WebP格式，如果是则转换为JPG
+            // WebP 格式：直接上传不转换（Java ImageIO 默认不支持 WebP 解码，OSS 与万相 API 均支持 WEBP）
             if (isWebpFormat(suffix, imageBytes)) {
-                imageBytes = convertWebpToJpg(imageBytes);
-                suffix = ".jpg";
-                log.info("检测到WebP格式图片，已转换为JPG格式");
+                suffix = ".webp";
+                log.info("检测到WebP格式图片，将直接上传为 WebP");
             }
 
             String objectKey = generateChatImageObjectKey(userId, suffix);
@@ -278,24 +273,4 @@ public class AliOssUtil {
         return false;
     }
 
-    /**
-     * 将WebP格式图片转换为JPG格式
-     */
-    private byte[] convertWebpToJpg(byte[] webpBytes) throws IOException {
-        try (ByteArrayInputStream inputStream = new ByteArrayInputStream(webpBytes)) {
-            BufferedImage image = ImageIO.read(inputStream);
-            if (image == null) {
-                throw new IOException("无法读取WebP图片");
-            }
-
-            try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
-                // 转换为JPG格式
-                boolean success = ImageIO.write(image, "jpg", outputStream);
-                if (!success) {
-                    throw new IOException("图片格式转换失败");
-                }
-                return outputStream.toByteArray();
-            }
-        }
-    }
 }

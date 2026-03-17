@@ -7,9 +7,12 @@ import { useBack } from "@/lib/use-back"
 import { ArrowLeft, Heart, MessageCircle } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import { toast } from "sonner"
+import { format } from "date-fns"
+import { zhCN } from "date-fns/locale"
 import {
   listMyPosts,
   togglePostPublic,
+  getPostInputImageUrls,
   type CommunityPostWrap,
 } from "@/lib/api/ai-community"
 
@@ -76,11 +79,24 @@ export default function MyPostsPage() {
                   href={`/community/${item.post.postId}`}
                   className="flex min-w-0 flex-1 items-center gap-3 text-left"
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={item.post.outputImageUrl} alt="" className="h-16 w-16 shrink-0 rounded-lg object-cover" />
+                  <div className="flex shrink-0 items-end overflow-hidden rounded-lg border border-[var(--card-border)] bg-[var(--muted)]">
+                    {getPostInputImageUrls(item.post).slice(0, 2).map((url, i) => (
+                      <div key={i} className="h-10 w-10 shrink-0 overflow-hidden border-r border-[var(--card-border)] last:border-r-0">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={url} alt="" className="h-full w-full object-cover block" referrerPolicy="no-referrer" />
+                      </div>
+                    ))}
+                    <div className="h-16 w-16 shrink-0 overflow-hidden">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={item.post.outputImageUrl} alt="" className="h-full w-full object-cover block" referrerPolicy="no-referrer" />
+                    </div>
+                  </div>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium">{item.post.promptText.slice(0, 30)}</p>
-                    <div className="mt-1 flex items-center gap-3 text-xs text-[var(--foreground-muted)]">
+                    <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-[var(--foreground-muted)]">
+                      {item.post.createdAt && (
+                        <span>{format(new Date(item.post.createdAt), "yyyy-MM-dd HH:mm", { locale: zhCN })}</span>
+                      )}
                       <span className="flex items-center gap-1"><Heart className="h-3 w-3" /> {wrap.likeCount ?? 0}</span>
                       <span className="flex items-center gap-1"><MessageCircle className="h-3 w-3" /> {wrap.commentCount ?? 0}</span>
                       {wrap.usageCount != null && <span>{wrap.usageCount} 人使用</span>}

@@ -16,12 +16,31 @@ export interface CommunityPostWrap {
     userId: number
     templateId?: number
     inputImageUrl: string
+    /** 多张参考图 URL 数组的 JSON 字符串，兼容旧数据仅含 inputImageUrl */
+    inputImageUrls?: string
     outputImageUrl: string
     promptText: string
     isPublic: boolean
     createdAt?: string
   }
   authorName: string
+}
+
+/** 解析作品的参考图列表：优先 inputImageUrls（JSON 字符串或已解析数组），否则用 inputImageUrl 单图 */
+export function getPostInputImageUrls(post: CommunityPostWrap["post"]): string[] {
+  const raw =
+    (post as { inputImageUrls?: string | string[]; input_image_urls?: string | string[] }).inputImageUrls ??
+    (post as { input_image_urls?: string | string[] }).input_image_urls
+  if (Array.isArray(raw)) return raw.filter((u): u is string => typeof u === "string" && !!u)
+  try {
+    if (typeof raw === "string" && raw.trim()) {
+      const arr = JSON.parse(raw) as unknown
+      if (Array.isArray(arr)) return arr.filter((u): u is string => typeof u === "string" && !!u)
+    }
+  } catch {
+    // ignore
+  }
+  return post.inputImageUrl ? [post.inputImageUrl] : []
 }
 
 export interface CommunityPostComment {

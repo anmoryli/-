@@ -3,11 +3,12 @@
 import { useEffect, useState, useCallback } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { useBack } from "@/lib/use-back"
-import { ArrowLeft, Heart, MessageCircle, Send, Sparkles, CornerDownRight } from "lucide-react"
+import { ArrowLeft, Heart, MessageCircle, Send, Sparkles, CornerDownRight, X } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import { toast } from "sonner"
 import {
   listPublicRecommendedPosts,
+  listMyPosts,
   getPostLikeStatus,
   togglePostLike,
   getPostComments,
@@ -15,6 +16,7 @@ import {
   updatePostComment,
   deletePostComment,
   toggleCommentLike,
+  getPostInputImageUrls,
   type CommunityPostWrap,
   type CommunityPostComment,
 } from "@/lib/api/ai-community"
@@ -54,6 +56,7 @@ export default function CommunityPostDetailPage() {
   const [replyTarget, setReplyTarget] = useState<{ commentId: number; username: string } | null>(null)
   const [editingId, setEditingId] = useState<number | null>(null)
   const [editingContent, setEditingContent] = useState("")
+  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null)
 
   const loadComments = useCallback(async () => {
     if (!user) return
@@ -65,8 +68,13 @@ export default function CommunityPostDetailPage() {
     const load = async () => {
       setLoading(true)
       try {
-        const all = await listPublicRecommendedPosts()
-        const found = all.find((p) => p.post.postId === postId) ?? null
+        let found: CommunityPostWrap | null = null
+        const publicList = await listPublicRecommendedPosts()
+        found = publicList.find((p) => p.post.postId === postId) ?? null
+        if (!found && user) {
+          const myList = await listMyPosts(user.userId)
+          found = myList.find((p) => p.post.postId === postId) ?? null
+        }
         setPost(found)
         if (found && user) {
           const status = await getPostLikeStatus(postId, user.userId)
@@ -157,25 +165,79 @@ export default function CommunityPostDetailPage() {
         <span className="text-sm font-medium">{post.authorName}</span>
       </div>
 
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={post.post.outputImageUrl} alt="效果图" className="w-full" />
+      <button
+        type="button"
+        onClick={() => setPreviewImageUrl(post.post.outputImageUrl)}
+        className="w-full text-left"
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={post.post.outputImageUrl} alt="效果图" className="w-full cursor-zoom-in" />
+      </button>
 
       <div className="space-y-4 px-4 pt-4">
         <p className="text-sm text-[var(--foreground)]">{post.post.promptText}</p>
 
-        <div className="flex gap-3">
-          <div className="flex-1 overflow-hidden rounded-xl bg-transparent">
+        {(() => {
+          const inputUrls = getPostInputImageUrls(post.post)
+          return (
+            <>
+              {inputUrls.length > 0 && (
+                <div>
+                  <p className="mb-2 text-[11px] font-medium text-[var(--foreground-muted)]">
+                    参考图 {inputUrls.length} 张
+                  </p>
+                  <div className="flex overflow-x-auto pb-1 scrollbar-thin">
+                    {inputUrls.map((url, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => setPreviewImageUrl(url)}
+                        className="h-24 w-24 shrink-0 overflow-hidden border-0 border-r border-[var(--card-border)] bg-[var(--muted)] last:border-r-0 first:rounded-l-lg last:rounded-r-lg"
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={url} alt={`参考图${i + 1}`} className="h-full w-full object-cover block" referrerPolicy="no-referrer" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div>
+                <p className="mb-2 text-[11px] font-medium text-[var(--foreground-muted)]">效果图</p>
+                <button
+                  type="button"
+                  onClick={() => setPreviewImageUrl(post.post.outputImageUrl)}
+                  className="block w-full overflow-hidden rounded-xl border border-[var(--card-border)] bg-[var(--muted)]"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={post.post.outputImageUrl} alt="效果图" className="h-40 w-full object-cover sm:h-48" referrerPolicy="no-referrer" />
+                </button>
+              </div>
+            </>
+          )
+        })()}
+      </div>
+
+      {previewImageUrl && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4"
+          onClick={() => setPreviewImageUrl(null)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="图片预览"
+        >
+          <div className="relative max-h-[90vh] max-w-[95vw]" onClick={(e) => e.stopPropagation()}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={post.post.inputImageUrl} alt="原图" className="h-32 w-full object-cover" />
-            <p className="py-1 text-center text-[11px] text-[var(--foreground-muted)]">原图</p>
-          </div>
-          <div className="flex-1 overflow-hidden rounded-xl bg-transparent">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={post.post.outputImageUrl} alt="效果图" className="h-32 w-full object-cover" />
-            <p className="py-1 text-center text-[11px] text-[var(--foreground-muted)]">效果图</p>
+            <img src={previewImageUrl} alt="预览" className="max-h-[90vh] max-w-full rounded-lg object-contain" />
+            <button
+              type="button"
+              onClick={() => setPreviewImageUrl(null)}
+              className="absolute -top-10 right-0 flex items-center gap-1 rounded-lg border border-[var(--card-border)] bg-[var(--card)] px-3 py-1.5 text-sm text-[var(--foreground)]"
+            >
+              <X className="h-4 w-4" /> 关闭
+            </button>
           </div>
         </div>
-      </div>
+      )}
 
       <div className="mt-4 border-t border-[var(--card-border)] px-4 pt-4">
         <p className="text-sm font-medium">评论 {comments.length}</p>

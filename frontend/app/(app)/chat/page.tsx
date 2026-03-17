@@ -524,7 +524,7 @@ export default function ChatPage() {
           )
         },
         images,
-        user.userType === "pregnant" && publishImageToCommunity && images.length === 1,
+        user.userType === "pregnant" && publishImageToCommunity && images.length >= 1,
         isScenarioSession ? () => setShowScenarioEndSuggest(true) : undefined
       )
       // 流式结束后立即使用后端持久化内容回填，避免必须退出重进才渲染正常
@@ -547,8 +547,8 @@ export default function ChatPage() {
       } catch {
         // ignore
       }
-      // 社区发布成功时显示发表动画
-      if (publishImageToCommunity && images?.length === 1) {
+      // 社区发布成功时显示发表动画（单图或多图均可发布）
+      if (publishImageToCommunity && images?.length >= 1) {
         setShowPublishSuccess(true)
         setTimeout(() => setShowPublishSuccess(false), 2200)
         toast.success("已发布到社区")
@@ -758,7 +758,7 @@ export default function ChatPage() {
               孕期小伴
             </h2>
             <p className="mt-2 max-w-xs text-caption">
-              你好呀～我是你的孕期小伴，可以陪你整理记录、写信给宝宝、回顾时光。
+              你好呀～我是你的孕期小伴，可以陪你整理记录、写信给宝宝、回顾时光、生成图片、理解图片、排忧解难、更多功能等你探索哦~
             </p>
             <div className="mt-8 w-full max-w-sm">
               <p className="mb-2 text-micro font-medium">试试问我</p>
@@ -833,14 +833,14 @@ export default function ChatPage() {
             ))}
           </div>
         )}
-        {selectedImages.length === 1 && user?.userType === "pregnant" && (
+        {selectedImages.length >= 1 && user?.userType === "pregnant" && (
           <label className="mb-2 flex items-center gap-2 text-[13px] text-[var(--foreground-muted)]">
             <input
               type="checkbox"
               checked={publishImageToCommunity}
               onChange={(e) => setPublishImageToCommunity(e.target.checked)}
             />
-            图生图完成后公开到社区（公开提示词、原图、结果图）
+            图生图完成后公开到社区哦~（公开提示词、首图、结果图）
           </label>
         )}
         <div className="flex items-center gap-2">
@@ -875,7 +875,7 @@ export default function ChatPage() {
                   ? "请输入提示词并上传一张图片"
                   : isScenarioSession
                     ? "输入消息… 结束可点「结束情景」生成报告"
-                    : "输入消息..."
+                    : "输入消息...(可上传多张图生成)"
               }
               rows={1}
               className="min-h-[44px] w-full resize-none rounded-xl border border-[var(--card-border)] bg-[var(--background)] py-3 pl-4 pr-4 text-body leading-tight placeholder:text-[var(--foreground-muted)] focus:border-[var(--accent-1)] focus:outline-none"
@@ -890,7 +890,7 @@ export default function ChatPage() {
                 ? "border border-[var(--accent-2)]/50 bg-[var(--accent-2)] text-[var(--foreground)] active:opacity-90"
                 : "border border-[var(--card-border)] bg-[var(--muted)] text-[var(--foreground-muted)]"
             )}
-            aria-label="发送"
+            aria-label="发送叭~"
           >
             <Send className="h-5 w-5" strokeWidth={1.75} />
           </button>
