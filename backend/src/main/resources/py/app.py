@@ -251,6 +251,24 @@ async def embed_one(body: EmbedBody = Body(...)):
         raise HTTPException(500, str(e))
 
 
+# ==================== 按 source + source_id 删除向量（多源异构数据同步）===================
+@app.delete("/api/v1/delete")
+async def delete_vectors(
+        source: str = Query(..., description="memo|message|pdf|image_desc"),
+        source_id: str = Query(..., description="业务表主键"),
+):
+    """按 source + source_id 删除向量库中的对应条目，用于记录删除时同步清理"""
+    try:
+        # Milvus 过滤表达式：source 和 source_id 为 VARCHAR 类型，需用引号
+        filter_expr = f'source == "{source}" and source_id == "{source_id}"'
+        clients.milvus.delete(collection_name=config.RAG_COLLECTION_NAME, filter=filter_expr)
+        logger.info(f"删除向量成功 source={source} source_id={source_id}")
+        return {"code": 200, "message": "deleted", "data": None}
+    except Exception as e:
+        logger.error(f"删除向量失败 source={source} source_id={source_id}: {e}")
+        raise HTTPException(500, str(e))
+
+
 # ==================== 百科嵌入（knowledge 目录 → 全局区 user_id=-1）===================
 @app.post("/api/v1/embed-knowledge")
 async def embed_knowledge():

@@ -50,4 +50,15 @@ public interface FileMapper {
      */
     @Select("SELECT url FROM yunfu.file WHERE memo_id = #{memoId}")
     String selectFileUrlByMemoId(Integer memoId);
+
+    @Select("<script>SELECT f.file_id, f.memo_id, f.title, f.url, f.created_at, f.updated_at FROM yunfu.file f WHERE f.memo_id IN <foreach collection='memoIds' item='id' open='(' separator=',' close=')'>#{id}</foreach></script>")
+    @Results({
+            @Result(column = "file_id", property = "fileId"),
+            @Result(column = "memo_id", property = "memoId"),
+            @Result(column = "title", property = "title"),
+            @Result(column = "url", property = "url"),
+            @Result(column = "created_at", property = "createdAt"),
+            @Result(column = "updated_at", property = "updatedAt")
+    })
+    List<File> selectByMemoIds(@Param("memoIds") List<Integer> memoIds);
 }

@@ -77,6 +77,7 @@ export function PhotoCarousel({
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={url}
+                  loading="lazy"
                   alt={`${alt} ${i + 1}`}
                   className="max-h-full max-w-full object-contain"
                   draggable={false}
@@ -142,6 +143,7 @@ export function PhotoCarousel({
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={urls[activeIndex]}
+              loading="lazy"
               alt={`${alt} ${activeIndex + 1}`}
               className="max-h-[90vh] max-w-[90vw] object-contain"
             />

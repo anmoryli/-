@@ -12,6 +12,7 @@ import com.anmory.yunji.mapper.PhotoMapper;
 import com.anmory.yunji.mapper.TextMapper;
 import com.anmory.yunji.mapper.UserDailyLogMapper;
 import com.anmory.yunji.mapper.VoiceMapper;
+import com.anmory.yunji.service.EmbedTaskService;
 import com.anmory.yunji.service.FamilyService;
 import com.anmory.yunji.service.GoalService;
 import com.anmory.yunji.service.MemoService;
@@ -42,6 +43,7 @@ public class MemoServiceImpl implements MemoService {
     private final FamilyService familyService;
     private final AliOssUtil aliOssUtil;
     private final UserDailyLogMapper userDailyLogMapper;
+    private final EmbedTaskService embedTaskService;
 
     // ========== 备忘录主表 ==========
     @Override
@@ -115,6 +117,12 @@ public class MemoServiceImpl implements MemoService {
             } catch (Exception ex) {
                 log.warn("删除 OSS 资源失败，memoId={}, url={}", memoId, url, ex);
             }
+        }
+
+        // 6. 提交向量库删除任务（多源异构数据同步）
+        embedTaskService.submitDelete(memo.getUserId(), "memo", String.valueOf(memoId));
+        if ("photo".equals(memo.getType())) {
+            embedTaskService.submitDelete(memo.getUserId(), "image_desc", String.valueOf(memoId));
         }
         return true;
     }
@@ -485,6 +493,30 @@ public class MemoServiceImpl implements MemoService {
             log.debug("读取当日体重失败 userId={}", userId, ex);
             return null;
         }
+    }
+
+    @Override
+    public List<Text> getTextByMemoIds(List<Integer> memoIds) {
+        if (memoIds == null || memoIds.isEmpty()) return List.of();
+        return textMapper.selectByMemoIds(memoIds);
+    }
+
+    @Override
+    public List<Voice> getVoiceByMemoIds(List<Integer> memoIds) {
+        if (memoIds == null || memoIds.isEmpty()) return List.of();
+        return voiceMapper.selectByMemoIds(memoIds);
+    }
+
+    @Override
+    public List<Photo> getPhotoByMemoIds(List<Integer> memoIds) {
+        if (memoIds == null || memoIds.isEmpty()) return List.of();
+        return photoMapper.selectByMemoIds(memoIds);
+    }
+
+    @Override
+    public List<File> getFileByMemoIds(List<Integer> memoIds) {
+        if (memoIds == null || memoIds.isEmpty()) return List.of();
+        return fileMapper.selectByMemoIds(memoIds);
     }
 
     /** 解析 category：中英文逗号、分号分隔，每标签≤6字，用英文逗号连接 */

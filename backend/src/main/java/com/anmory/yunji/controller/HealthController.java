@@ -8,11 +8,13 @@ import com.anmory.yunji.health.FetalReference;
 import com.anmory.yunji.health.WeightReference;
 import com.anmory.yunji.mapper.FetalUltrasoundRecordMapper;
 import com.anmory.yunji.mapper.PregnancyWeightRecordMapper;
+import com.anmory.yunji.service.FetalPdfService;
 import com.anmory.yunji.service.HealthAnalysisService;
 import com.anmory.yunji.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -33,6 +35,7 @@ public class HealthController {
     private final PregnancyWeightRecordMapper pregnancyWeightRecordMapper;
     private final FetalUltrasoundRecordMapper fetalUltrasoundRecordMapper;
     private final HealthAnalysisService healthAnalysisService;
+    private final FetalPdfService fetalPdfService;
 
     @PostMapping("/weightRecords")
     public Result<PregnancyWeightRecord> addWeightRecord(@RequestParam("userId") Integer userId,
@@ -83,6 +86,20 @@ public class HealthController {
             out.add(item);
         }
         return Result.success(out);
+    }
+
+    @PostMapping("/fetalRecords/parsePdf")
+    public Result<FetalUltrasoundRecord> parseFetalPdf(@RequestParam("userId") Integer userId,
+                                                       @RequestParam("file") MultipartFile file) {
+        log.info("[健康] parseFetalPdf 请求 userId={} fileName={}", userId, file != null ? file.getOriginalFilename() : null);
+        if (file == null || file.isEmpty()) {
+            return Result.error(400, "BAD_REQUEST", "请选择 PDF 文件");
+        }
+        FetalUltrasoundRecord record = fetalPdfService.parseOnly(userId, file);
+        if (record == null) {
+            return Result.error(400, "PARSE_FAILED", "B超 PDF 解析失败，请尝试手动录入或检查文件格式");
+        }
+        return Result.success(record);
     }
 
     @PostMapping("/fetalRecords")

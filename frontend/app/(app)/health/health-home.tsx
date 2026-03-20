@@ -1,10 +1,10 @@
 "use client"
 
 import Link from "next/link"
-import { useMemo } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { ChevronRight, HeartPulse, Ruler, Scale } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
-import { useHealthSummary } from "@/lib/hooks/use-health"
+import { getHealthSummary } from "@/lib/api/health"
 
 function formatWeekLabel(week: unknown) {
   const w = typeof week === "number" ? week : typeof week === "string" ? Number(week) : NaN
@@ -14,7 +14,13 @@ function formatWeekLabel(week: unknown) {
 
 export function HealthHome({ showHeader = true }: { showHeader?: boolean }) {
   const { user } = useAuth()
-  const { data: summary = null } = useHealthSummary(user?.userId)
+  const [summary, setSummary] = useState<Awaited<ReturnType<typeof getHealthSummary>>>(null)
+
+  useEffect(() => {
+    if (!user?.userId) return
+    getHealthSummary(user.userId).then((s) => setSummary(s ?? null)).catch(() => setSummary(null))
+  }, [user?.userId])
+
   const weekLabel = useMemo(() => formatWeekLabel(summary?.gestationWeek), [summary])
 
   return (

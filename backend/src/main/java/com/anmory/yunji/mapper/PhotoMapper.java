@@ -53,4 +53,14 @@ public interface PhotoMapper {
     @Select("SELECT COUNT(*) FROM yunfu.photo p JOIN yunfu.memo m ON p.memo_id = m.memo_id WHERE m.user_id = #{userId}")
     int countByUserId(@Param("userId") Integer userId);
 
+    @Select("<script>SELECT p.photo_id, p.memo_id, p.url, p.created_at, p.updated_at FROM yunfu.photo p WHERE p.memo_id IN <foreach collection='memoIds' item='id' open='(' separator=',' close=')'>#{id}</foreach></script>")
+    @Results({
+            @Result(column = "photo_id", property = "photoId"),
+            @Result(column = "memo_id", property = "memoId"),
+            @Result(column = "url", property = "url"),
+            @Result(column = "created_at", property = "createdAt"),
+            @Result(column = "updated_at", property = "updatedAt")
+    })
+    List<Photo> selectByMemoIds(@Param("memoIds") List<Integer> memoIds);
+
 }

@@ -488,6 +488,72 @@ export async function getAllEnriched(userId: number, requestUserId?: number): Pr
   })
 }
 
+/** 后端分页合并接口返回的原始结构 */
+interface EnrichedMemoRaw {
+  memoId?: number
+  id?: number
+  createdAt?: string
+  createTime?: string
+  type?: string
+  tag?: string
+  title?: string
+  content?: string
+  voiceUrl?: string
+  photoUrls?: string[]
+  photoDescription?: string
+  fileUrl?: string
+  recordBy?: "mom" | "dad"
+  mood?: string
+  weightKg?: number
+  recordWeightKg?: number
+  pregnancyWeek?: string
+  pregnancyWeekIndex?: number
+}
+
+/** 分页获取合并后的记录（用于列表懒加载，滚动加载更多） */
+export async function getAllEnrichedPaged(
+  userId: number,
+  page: number,
+  pageSize: number,
+  requestUserId?: number
+): Promise<MemoItem[]> {
+  log("getAllEnrichedPaged", { userId, requestUserId, page, pageSize })
+  if (USE_MOCK) {
+    await mockDelay()
+    return mockGetAllMemos().slice((page - 1) * pageSize, page * pageSize)
+  }
+  const params: Record<string, string | number> = { userId, page, pageSize }
+  if (requestUserId != null) params.requestUserId = requestUserId
+  const raw = await apiGet<EnrichedMemoRaw[]>("/api/memo/getAllEnrichedPaged", params)
+  const list = (raw ?? []).map((r) => {
+    const type = (r.type === "text" || r.type === "voice" || r.type === "file" || r.type === "photo"
+      ? r.type
+      : "text") as MemoItem["type"]
+    return {
+      id: r.memoId ?? r.id ?? 0,
+      type,
+      tag: r.tag,
+      createTime: r.createTime ?? r.createdAt,
+      title: r.title,
+      content: r.content,
+      voiceUrl: r.voiceUrl,
+      photoUrls: r.photoUrls ?? [],
+      photoDescription: r.photoDescription,
+      fileUrl: r.fileUrl,
+      recordBy: r.recordBy,
+      mood: r.mood,
+      recordWeightKg: r.recordWeightKg ?? r.weightKg,
+      pregnancyWeek: r.pregnancyWeek,
+      pregnancyWeekIndex: r.pregnancyWeekIndex,
+    } satisfies MemoItem
+  })
+  return list.sort((a, b) => {
+    const ta = a.createTime ? new Date(a.createTime).getTime() : 0
+    const tb = b.createTime ? new Date(b.createTime).getTime() : 0
+    return tb - ta
+  })
+}
+
 /** 按 ID 获取单条记录（含权限校验），用于详情页在列表中未命中时的回退。404 或无权限时返回 null。 */
 export async function getRecordById(memoId: number, requestUserId: number): Promise<MemoItem | null> {
   log("getRecordById", { memoId, requestUserId })

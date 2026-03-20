@@ -36,8 +36,8 @@ export function GoalWidget({ userId }: GoalWidgetProps) {
           <Target className="h-5 w-5" strokeWidth={1.75} />
         </div>
         <div className="min-w-0 flex-1">
-          <h3 className="text-[15px] font-semibold text-[var(--foreground)]">孕期小目标</h3>
-          <p className="mt-0.5 text-xs text-[var(--foreground-muted)]">
+          <h3 className="text-[15px] font-semibold text-[var(--foreground)] whitespace-nowrap truncate">孕期小目标</h3>
+          <p className="mt-0.5 text-xs text-[var(--foreground-muted)] whitespace-nowrap truncate">
             已完成 {completed.length} / {progress.length}
           </p>
         </div>
@@ -49,7 +49,7 @@ export function GoalWidget({ userId }: GoalWidgetProps) {
             <div key={p.templateId} className="flex items-center justify-between text-sm">
               <span className="truncate text-[var(--foreground)]">{p.templateName}</span>
               <span
-                className={`ml-2 shrink-0 font-medium ${
+                className={`ml-2 shrink-0 font-medium whitespace-nowrap ${
                   p.status === "completed" ? "text-[var(--accent-1)]" : "text-[var(--foreground-muted)]"
                 }`}
               >

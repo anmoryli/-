@@ -12,8 +12,8 @@ import java.util.List;
 @Mapper
 public interface FetalUltrasoundRecordMapper {
 
-    @Insert("INSERT INTO fetal_ultrasound_record (user_id, record_date, gestation_week, bpd_mm, hc_mm, ac_mm, fl_mm, efw_g, note) " +
-            "VALUES (#{userId}, #{recordDate}, #{gestationWeek}, #{bpdMm}, #{hcMm}, #{acMm}, #{flMm}, #{efwG}, #{note})")
+    @Insert("INSERT INTO fetal_ultrasound_record (user_id, record_date, gestation_week, bpd_mm, hc_mm, ac_mm, fl_mm, efw_g, note, file_url) " +
+            "VALUES (#{userId}, #{recordDate}, #{gestationWeek}, #{bpdMm}, #{hcMm}, #{acMm}, #{flMm}, #{efwG}, #{note}, #{fileUrl})")
     @Options(useGeneratedKeys = true, keyProperty = "id")
     void insert(FetalUltrasoundRecord record);
 

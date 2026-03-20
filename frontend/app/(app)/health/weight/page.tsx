@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react"
 import { useBack } from "@/lib/use-back"
 import { ArrowLeft, Plus, TrendingUp } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
-import { mutateWeightRecords } from "@/lib/hooks/use-health"
 import { addWeightRecord, listWeightRecords, getHealthSummary } from "@/lib/api/health"
 import { toast } from "sonner"
 type WeightListItem = Record<string, unknown>
@@ -76,7 +75,6 @@ export default function WeightPage() {
         weightKg: Number(weightKg),
         note: note || undefined,
       })
-      mutateWeightRecords(user?.userId)
       toast.success("已记录。健康建议生成中，请稍后到「我的」→「健康档案」查看")
       setWeightKg("")
       setNote("")
@@ -117,10 +115,12 @@ export default function WeightPage() {
                   className="h-10 rounded-xl border border-[var(--card-border)] bg-[var(--background-alt)] px-3 text-sm text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--ring)]"
                 />
               </label>
-              <label className="grid gap-1">
+              <label className="grid gap-1 min-w-0">
                 <span className="text-xs text-[var(--foreground-secondary)]">当前孕周</span>
-                <div className="flex h-10 items-center rounded-xl border border-[var(--card-border)] bg-[var(--background-alt)] px-3 text-sm text-[var(--foreground)]">
-                  {gestationWeek != null ? `孕 ${gestationWeek} 周` : "请先在「我的」设置末次月经或预产期"}
+                <div className="flex h-10 min-w-0 items-center rounded-xl border border-[var(--card-border)] bg-[var(--background-alt)] px-3 text-sm text-[var(--foreground)]">
+                  <span className="truncate whitespace-nowrap" title={gestationWeek != null ? `孕 ${gestationWeek} 周` : "请先在「我的」设置末次月经或预产期"}>
+                    {gestationWeek != null ? `孕 ${gestationWeek} 周` : "请先在「我的」设置末次月经或预产期"}
+                  </span>
                 </div>
               </label>
             </div>
@@ -180,12 +180,12 @@ export default function WeightPage() {
                   className={idx > 0 ? "border-t border-[var(--card-border)]" : ""}
                 >
                   <div className="flex items-center justify-between gap-2 px-4 py-3">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-[var(--foreground)]">
+                    <div className="min-w-0 flex-1 overflow-hidden">
+                      <p className="truncate text-sm font-semibold text-[var(--foreground)] whitespace-nowrap">
                         {(record.recordDate as string) ?? "—"}{" "}
                         {record.gestationWeek ? `· 孕${record.gestationWeek}周` : ""}
                       </p>
-                      <p className="mt-0.5 text-xs text-[var(--foreground-secondary)]">
+                      <p className="mt-0.5 text-xs text-[var(--foreground-secondary)] truncate whitespace-nowrap" title={`体重：${record.weightKg ?? "—"} kg${gainKg != null ? ` · 相对首次增重：${gainKg} kg` : ""}`}>
                         体重：{record.weightKg ?? "—"} kg
                         {gainKg != null ? ` · 相对首次增重：${gainKg} kg` : ""}
                       </p>
@@ -195,7 +195,7 @@ export default function WeightPage() {
                     </span>
                   </div>
                   {range?.min != null && range?.max != null && (
-                    <div className="px-4 pb-3 text-xs text-[var(--foreground-secondary)]">
+                    <div className="px-4 pb-3 text-xs text-[var(--foreground-secondary)] whitespace-nowrap overflow-hidden text-ellipsis">
                       参考增重范围：{String(range.min)} ~ {String(range.max)} kg
                     </div>
                   )}

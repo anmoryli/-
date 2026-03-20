@@ -12,10 +12,11 @@ import com.anmory.yunji.service.MemoAiEnrichmentService;
 import com.anmory.yunji.service.MentionMailService;
 import com.anmory.yunji.mapper.MemoMapper;
 import com.anmory.yunji.mapper.TextMapper;
-import com.anmory.yunji.common.RagService;
+import com.anmory.yunji.service.EmbedTaskService;
 import com.anmory.yunji.service.MailService;
 import com.anmory.yunji.service.MemoService;
 import com.anmory.yunji.service.PdfExportService;
+import com.anmory.yunji.service.PdfExtractionService;
 import com.anmory.yunji.service.PromptService;
 import com.anmory.yunji.service.UserNotificationService;
 import com.anmory.yunji.service.UserService;
@@ -34,9 +35,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
-import org.apache.pdfbox.Loader;
-import org.apache.pdfbox.pdmodel.PDDocument;
-import org.apache.pdfbox.text.PDFTextStripper;
 
 import java.io.ByteArrayOutputStream;
 import java.net.URLEncoder;
@@ -60,6 +58,7 @@ public class MemoController {
 
     private final MemoService memoService;
     private final AliOssUtil aliOssUtil;
+    private final PdfExtractionService pdfExtractionService;
     private final ChatClient chatClient;
     private final UserService userService;
     private final PdfExportService pdfExportService;
@@ -72,7 +71,7 @@ public class MemoController {
     private final ImageUnderstandingService imageUnderstandingService;
     private final TextMapper textMapper;
     private final MemoMapper memoMapper;
-    private final RagService ragService;
+    private final EmbedTaskService embedTaskService;
 
     // ========== 从用户表获取末次月经日，用于计算孕周 ==========
     private String getLastMenstrualDate(Integer userId) {
@@ -166,9 +165,10 @@ public class MemoController {
         mentionMailService.notifyMentionedMembersAsync(userId, memoId, "text", saveTitle, content);
         // 7. 孕妇新记录时通知配偶（有则发邮件，无则提醒加入）
         mentionMailService.notifySpouseNewRecordAsync(userId, memoId, "text", saveTitle, content);
-        // 8. RAG 异步嵌入文字记录
+        // 8. 提交嵌入任务（多源异构数据处理）
         if (content != null && !content.isBlank()) {
-            ragService.embedAsync(userId, content, "memo", String.valueOf(memoId));
+            String toEmbed = (saveTitle != null && !saveTitle.isBlank() ? saveTitle + "\n" : "") + content;
+            embedTaskService.submitUpsert(userId, toEmbed, "memo", String.valueOf(memoId));
         }
         return Result.success(memoId);
     }
@@ -246,7 +246,8 @@ public class MemoController {
         if (success && content != null && !content.isBlank()) {
             Integer memoId = textMapper.selectMemoIdByTextId(textId);
             if (memoId != null && userId != null) {
-                ragService.embedAsync(userId, content, "memo", String.valueOf(memoId));
+                String toEmbed = (title != null && !title.isBlank() ? title + "\n" : "") + content;
+                embedTaskService.submitUpsert(userId, toEmbed, "memo", String.valueOf(memoId));
             }
         }
         return Result.success(success);
@@ -299,6 +300,7 @@ public class MemoController {
             String finalVisibleTo = validateAndNormalizeVisibleTo(userId, mode, visibleTo);
             Integer memoId = memoService.addVoiceMemo(userId, saveTitle, voiceUrl, pregnancyWeek, mood, mode, finalVisibleTo, category);
             mentionMailService.notifySpouseNewRecordAsync(userId, memoId, "voice", saveTitle, null);
+            embedTaskService.submitUpsert(userId, saveTitle + "\n[URL] " + voiceUrl, "memo", String.valueOf(memoId));
             return Result.success(memoId);
         } catch (Exception e) {
             log.error("语音上传失败 userId={}", userId, e);
@@ -387,21 +389,21 @@ public class MemoController {
                     final byte[] bytesToExtract = pdfBytes;
                     CompletableFuture.runAsync(() -> {
                         try {
-                            String extracted = extractPdfTextFromBytes(bytesToExtract);
+                            String extracted = pdfExtractionService.extractWithStructure(bytesToExtract);
                             if (extracted != null && !extracted.isBlank()) {
                                 String withUrl = embedFileUrl != null && !embedFileUrl.isBlank()
                                         ? extracted + "\n[URL] " + embedFileUrl : extracted;
-                                ragService.embedAsync(uid, withUrl, "memo", String.valueOf(mid));
+                                embedTaskService.submitUpsert(uid, withUrl, "memo", String.valueOf(mid));
                             }
                         } catch (Exception e) {
-                            log.warn("PDF 文字提取或嵌入失败 memoId={}", mid, e);
+                            log.warn("PDF 文字提取失败 memoId={}", mid, e);
                         }
                     });
                 }
             } else {
                 String fileText = (title != null && !title.isBlank() ? title : "文件");
                 if (embedFileUrl != null && !embedFileUrl.isBlank()) {
-                    ragService.embedAsync(userId, fileText + "\n[URL] " + embedFileUrl, "memo", String.valueOf(memoId));
+                    embedTaskService.submitUpsert(userId, fileText + "\n[URL] " + embedFileUrl, "memo", String.valueOf(memoId));
                 }
             }
             return Result.success(memoId);
@@ -410,17 +412,6 @@ public class MemoController {
             String msg = e.getMessage() != null && !e.getMessage().isBlank() ? e.getMessage() : "文件上传失败，请稍后重试";
             if (msg.length() > 80) msg = msg.substring(0, 80) + "…";
             return Result.error(500, "FILE_UPLOAD_FAILED", msg);
-        }
-    }
-
-    private String extractPdfTextFromBytes(byte[] pdfBytes) {
-        if (pdfBytes == null || pdfBytes.length == 0) return "";
-        try (PDDocument doc = Loader.loadPDF(pdfBytes)) {
-            PDFTextStripper stripper = new PDFTextStripper();
-            return stripper.getText(doc);
-        } catch (Exception e) {
-            log.warn("PDF 正文抽取失败", e);
-            return "";
         }
     }
 
@@ -479,9 +470,9 @@ public class MemoController {
                     if (firstUrl != null && !firstUrl.isBlank()) {
                         toEmbed = toEmbed + "\n[URL] " + firstUrl;
                     }
-                    ragService.embedAsync(uid, toEmbed, "image_desc", String.valueOf(mid));
+                    embedTaskService.submitUpsert(uid, toEmbed, "image_desc", String.valueOf(mid));
                 } catch (Exception e) {
-                    log.warn("图片理解或嵌入失败 memoId={}", mid, e);
+                    log.warn("图片理解失败 memoId={}", mid, e);
                 }
             });
         }
@@ -619,6 +610,19 @@ public class MemoController {
         List<Memo> allMemo = memoService.getAllMemoByUserIdPaged(userId, viewer, pageSize, offset);
         log.info("[可见范围] getAllByUserId 返回 {} 条记录", allMemo != null ? allMemo.size() : 0);
         return Result.success(allMemo);
+    }
+
+    /** 分页获取合并后的记录列表（用于列表懒加载，滚动加载更多） */
+    @RequestMapping("/getAllEnrichedPaged")
+    public Result<List<EnrichedMemoItem>> getAllEnrichedPaged(@RequestParam("userId") Integer userId,
+                                                             @RequestParam(value = "requestUserId", required = false) Integer requestUserId,
+                                                             @RequestParam(defaultValue = "1") int page,
+                                                             @RequestParam(defaultValue = "20") int pageSize) {
+        log.info("[分页] getAllEnrichedPaged 请求 userId={} requestUserId={} page={} pageSize={}", userId, requestUserId, page, pageSize);
+        Integer viewer = requestUserId != null ? requestUserId : userId;
+        List<EnrichedMemoItem> list = pdfExportService.loadEnrichedItemsPaged(userId, viewer, page, pageSize);
+        log.info("[分页] getAllEnrichedPaged 返回 {} 条记录", list != null ? list.size() : 0);
+        return Result.success(list != null ? list : List.of());
     }
 
     // ========== PDF 导出 ==========

@@ -31,7 +31,7 @@ export function BabySizeVisual({ weeksPregnant, className = "" }: BabySizeVisual
         }}
         title={`孕${weeksPregnant}周 · 约${name}大小 (${size})`}
       />
-      <p className="text-[11px] text-[var(--foreground-muted)]">
+      <p className="text-[11px] text-[var(--foreground-muted)] whitespace-nowrap overflow-hidden text-ellipsis max-w-full" title={`约${name}大小 · ${size}`}>
         约{name}大小 · {size}
       </p>
     </div>

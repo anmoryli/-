@@ -54,4 +54,15 @@ public interface VoiceMapper {
     @Select("select count(voice_id) from yunfu.voice")
     Integer selectCount();
 
+    @Select("<script>SELECT v.voice_id, v.memo_id, v.title, v.url, v.created_at, v.updated_at FROM yunfu.voice v WHERE v.memo_id IN <foreach collection='memoIds' item='id' open='(' separator=',' close=')'>#{id}</foreach></script>")
+    @Results({
+            @Result(column = "voice_id", property = "voiceId"),
+            @Result(column = "memo_id", property = "memoId"),
+            @Result(column = "title", property = "title"),
+            @Result(column = "url", property = "url"),
+            @Result(column = "created_at", property = "createdAt"),
+            @Result(column = "updated_at", property = "updatedAt")
+    })
+    List<Voice> selectByMemoIds(@Param("memoIds") List<Integer> memoIds);
+
 }

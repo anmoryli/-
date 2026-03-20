@@ -1,11 +1,12 @@
 package com.anmory.yunji.service.impl;
 
-import com.anmory.yunji.common.RagService;
+import com.anmory.yunji.service.EmbedTaskService;
 import com.anmory.yunji.entity.CheckReport;
 import com.anmory.yunji.entity.User;
 import com.anmory.yunji.mapper.CheckReportMapper;
 import com.anmory.yunji.service.CheckReportService;
 import com.anmory.yunji.service.MailService;
+import com.anmory.yunji.service.PdfExtractionService;
 import com.anmory.yunji.service.PromptService;
 import com.anmory.yunji.service.UserService;
 import com.anmory.yunji.utils.AliOssUtil;
@@ -18,11 +19,8 @@ import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
-import org.apache.pdfbox.Loader;
-import org.apache.pdfbox.pdmodel.PDDocument;
-import org.apache.pdfbox.text.PDFTextStripper;
 
-import java.io.InputStream;
+import java.io.IOException;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -34,11 +32,12 @@ public class CheckReportServiceImpl implements CheckReportService {
     private final CheckReportMapper checkReportMapper;
     private final UserService userService;
     private final AliOssUtil aliOssUtil;
+    private final PdfExtractionService pdfExtractionService;
     private final OpenAiChatModel openAiChatModel;
     private final ObjectMapper objectMapper;
     private final MailService mailService;
     private final PromptService promptService;
-    private final RagService ragService;
+    private final EmbedTaskService embedTaskService;
 
     @Value("${check-report.max-retry:3}")
     private Integer maxRetry;
@@ -46,7 +45,7 @@ public class CheckReportServiceImpl implements CheckReportService {
     @Override
     public CheckReport uploadAndParse(Integer userId, MultipartFile file, String extraText) {
         String fileUrl = aliOssUtil.uploadFile(userId, file);
-        String extractedPdfText = extractPdfTextIfApplicable(file);
+        String extractedPdfText = extractPdfTextFromFile(file);
         AiParseResult parsed = parseByAi(file.getOriginalFilename(), fileUrl, extraText, extractedPdfText);
 
         CheckReport report = new CheckReport();
@@ -60,7 +59,7 @@ public class CheckReportServiceImpl implements CheckReportService {
         report.setRetryCount(0);
         checkReportMapper.insert(report);
         if (extractedPdfText != null && !extractedPdfText.isBlank() && report.getReportId() != null) {
-            ragService.embedAsync(userId, extractedPdfText, "pdf", String.valueOf(report.getReportId()));
+            embedTaskService.submitUpsert(userId, extractedPdfText, "pdf", String.valueOf(report.getReportId()));
         }
         return report;
     }
@@ -104,14 +103,13 @@ public class CheckReportServiceImpl implements CheckReportService {
                 "请按时复查，祝您和宝宝健康平安。";
     }
 
-    private String extractPdfTextIfApplicable(MultipartFile file) {
+    private String extractPdfTextFromFile(MultipartFile file) {
         if (file == null || file.getOriginalFilename() == null) return "";
         if (!file.getOriginalFilename().toLowerCase().endsWith(".pdf")) return "";
-        try (InputStream is = file.getInputStream();
-             PDDocument doc = Loader.loadPDF(is.readAllBytes())) {
-            PDFTextStripper stripper = new PDFTextStripper();
-            return stripper.getText(doc);
-        } catch (Exception e) {
+        try {
+            byte[] bytes = file.getBytes();
+            return pdfExtractionService.extractWithStructure(bytes);
+        } catch (IOException e) {
             log.warn("PDF 正文抽取失败", e);
             return "";
         }

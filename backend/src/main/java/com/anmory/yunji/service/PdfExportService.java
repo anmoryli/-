@@ -40,4 +40,9 @@ public interface PdfExportService {
      * 加载指定用户的记录并转为 EnrichedMemoItem 列表（用于按 scope 导出）
      */
     List<EnrichedMemoItem> loadEnrichedItems(Integer userId);
+
+    /**
+     * 分页加载指定用户的记录并转为 EnrichedMemoItem 列表（用于列表懒加载）
+     */
+    List<EnrichedMemoItem> loadEnrichedItemsPaged(Integer userId, Integer requestUserId, int page, int pageSize);
 }

@@ -19,9 +19,9 @@ export function DailyTipCard({ lastMenstrualDate, dueDate, customTip }: DailyTip
       <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-[var(--accent-3)]">
         <Sparkles className="h-5 w-5" strokeWidth={1.5} />
       </div>
-      <div className="min-w-0 flex-1">
-        <p className="text-[12px] font-medium text-[var(--accent-3)]">本周小贴士</p>
-        <p className="mt-1 text-[15px] leading-relaxed text-[var(--foreground)]">
+      <div className="min-w-0 flex-1 overflow-hidden">
+        <p className="text-[12px] font-medium text-[var(--accent-3)] whitespace-nowrap">本周小贴士</p>
+        <p className="mt-1 text-[15px] leading-relaxed text-[var(--foreground)] whitespace-nowrap overflow-hidden text-ellipsis" title={tip}>
           {tip}
         </p>
       </div>

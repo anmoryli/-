@@ -1,18 +1,44 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { useBack } from "@/lib/use-back"
 import { ArrowLeft, Target, Award, TrendingUp } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
-import { useGoals } from "@/lib/hooks/use-goals"
+import { getGoalProgress, getAchievements, type GoalProgress, type UserAchievement } from "@/lib/api/goal"
+import { getHealthValueHistory, getTodayLog, type UserDailyLog } from "@/lib/api/daily"
 
 export default function GoalsPage() {
   const goBack = useBack("/")
   const { user } = useAuth()
-  const { data: goalsData, isLoading: loading } = useGoals(user?.userId)
-  const progress = goalsData?.progress ?? []
-  const achievements = goalsData?.achievements ?? []
-  const healthHistory = goalsData?.healthHistory ?? []
-  const todayHealth = goalsData?.todayHealth ?? null
+  const [progress, setProgress] = useState<GoalProgress[]>([])
+  const [achievements, setAchievements] = useState<UserAchievement[]>([])
+  const [healthHistory, setHealthHistory] = useState<Array<{ date: string; healthValue: number }>>([])
+  const [todayHealth, setTodayHealth] = useState<number | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    if (!user?.userId) return
+    setLoading(true)
+    Promise.all([
+      getGoalProgress(user.userId),
+      getAchievements(user.userId),
+      getHealthValueHistory(user.userId, 14),
+      getTodayLog(user.userId),
+    ])
+      .then(([p, a, hh, today]) => {
+        setProgress(p ?? [])
+        setAchievements(a ?? [])
+        setHealthHistory(hh ?? [])
+        setTodayHealth((today as UserDailyLog | null)?.healthValue ?? null)
+      })
+      .catch(() => {
+        setProgress([])
+        setAchievements([])
+        setHealthHistory([])
+        setTodayHealth(null)
+      })
+      .finally(() => setLoading(false))
+  }, [user?.userId])
 
   if (!user) return null
 

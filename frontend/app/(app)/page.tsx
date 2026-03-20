@@ -1,6 +1,7 @@
 "use client"
 
-import { useEffect } from "react"
+import dynamic from "next/dynamic"
+import { useEffect, useState } from "react"
 import { ProgressCircle } from "@/components/home/progress-circle"
 import { DailyTipCard } from "@/components/home/daily-tip-card"
 import { HealthArchiveCard } from "@/components/home/health-archive-card"
@@ -8,22 +9,22 @@ import { VoiceRecordBubble } from "@/components/home/voice-record-bubble"
 import { QuickActions } from "@/components/home/quick-actions"
 import { RecentRecords } from "@/components/home/recent-records"
 import { RecordStats } from "@/components/home/record-stats"
-import { TrendChart } from "@/components/home/trend-chart"
-import { WeightChart } from "@/components/home/weight-chart"
-import { MoodChart } from "@/components/home/mood-chart"
-import { KickCounter } from "@/components/home/kick-counter"
-import { MoodPicker } from "@/components/home/mood-picker"
-import { ContractionTimer } from "@/components/home/contraction-timer"
 import { ShareCard } from "@/components/home/share-card"
-import { GoalWidget } from "@/components/home/goal-widget"
-import { TimeCapsule } from "@/components/home/time-capsule"
-import { SpouseEmotionCard } from "@/components/home/spouse-emotion-card"
 import { useAuth } from "@/lib/auth-context"
-import { useRecords } from "@/lib/hooks/use-records"
+import { getAllEnrichedPaged, getFamilyEnriched, type MemoItem } from "@/lib/api/memo"
 import { getPregnancyInfo, getWeeklyTip, getDailyWarmth } from "@/lib/pregnancy"
 import { toast } from "sonner"
 import { format } from "date-fns"
 
+const TrendChart = dynamic(() => import("@/components/home/trend-chart").then((m) => ({ default: m.TrendChart })), { ssr: false })
+const WeightChart = dynamic(() => import("@/components/home/weight-chart").then((m) => ({ default: m.WeightChart })), { ssr: false })
+const MoodChart = dynamic(() => import("@/components/home/mood-chart").then((m) => ({ default: m.MoodChart })), { ssr: false })
+const KickCounter = dynamic(() => import("@/components/home/kick-counter").then((m) => ({ default: m.KickCounter })), { ssr: false })
+const MoodPicker = dynamic(() => import("@/components/home/mood-picker").then((m) => ({ default: m.MoodPicker })), { ssr: false })
+const ContractionTimer = dynamic(() => import("@/components/home/contraction-timer").then((m) => ({ default: m.ContractionTimer })), { ssr: false })
+const GoalWidget = dynamic(() => import("@/components/home/goal-widget").then((m) => ({ default: m.GoalWidget })), { ssr: false })
+const TimeCapsule = dynamic(() => import("@/components/home/time-capsule").then((m) => ({ default: m.TimeCapsule })), { ssr: false })
+const SpouseEmotionCard = dynamic(() => import("@/components/home/spouse-emotion-card").then((m) => ({ default: m.SpouseEmotionCard })), { ssr: false })
 const DAILY_TIP_SHOWN_KEY = "yunqi_daily_tip_shown"
 const DAILY_TIPS_KEY = "yunqi_notify_daily_tips"
 const RECORD_REMINDER_KEY = "yunqi_notify_record_reminder"
@@ -31,7 +32,26 @@ const RECORD_REMINDER_SHOWN_KEY = "yunqi_record_reminder_shown"
 
 export default function HomePage() {
   const { user } = useAuth()
-  const { data: records = [], isLoading: loading } = useRecords(user?.userId, user?.userType)
+  const [records, setRecords] = useState<MemoItem[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    if (!user?.userId) return
+    setLoading(true)
+    const fetchRecords = async () => {
+      try {
+        const list = user.userType === "family_member"
+          ? await getFamilyEnriched(user.userId)
+          : await getAllEnrichedPaged(user.userId, 1, 30, user.userId)
+        setRecords(list ?? [])
+      } catch {
+        setRecords([])
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchRecords()
+  }, [user?.userId, user?.userType])
 
   useEffect(() => {
     try {
@@ -82,8 +102,8 @@ export default function HomePage() {
     <div className="min-h-dvh pb-24">
       <div className="space-y-0 px-5 pb-8">
         {/* Header: 紧凑日期与问候 */}
-        <div className="pt-12 pb-4">
-          <p className="text-[13px] text-[var(--foreground-secondary)]">
+        <div className="pt-12 pb-4 min-w-0 overflow-hidden">
+          <p className="text-[13px] text-[var(--foreground-secondary)] whitespace-nowrap overflow-hidden text-ellipsis" title={new Date().toLocaleDateString("zh-CN", { year: "numeric", month: "long", day: "numeric", weekday: "long" })}>
             {new Date().toLocaleDateString("zh-CN", {
               year: "numeric",
               month: "long",

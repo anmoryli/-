@@ -11,6 +11,7 @@ const nextConfig = {
   // 大文件上传经代理时需提高 body 限制（如 20MB+ 视频）
   experimental: {
     proxyClientMaxBodySize: "500mb",
+    serverActions: { bodySizeLimit: "50mb" },
   },
   async headers() {
     return [

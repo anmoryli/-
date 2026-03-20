@@ -78,7 +78,7 @@ export function QuickActions({ isPregnant = true }: { isPregnant?: boolean }) {
             >
               <Icon className="h-5 w-5" strokeWidth={1.75} />
             </div>
-            <span className="text-[13px] font-medium text-[var(--foreground)]">
+            <span className="text-[13px] font-medium text-[var(--foreground)] whitespace-nowrap overflow-hidden text-ellipsis max-w-full text-center">
               {action.label}
             </span>
           </Link>

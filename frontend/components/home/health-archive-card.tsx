@@ -45,23 +45,23 @@ export function HealthArchiveCard({ userId }: HealthArchiveCardProps) {
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-[var(--accent-1)]">
               <Heart className="h-5 w-5" strokeWidth={1.5} />
             </div>
-            <div>
-              <p className="text-[15px] font-medium text-[var(--foreground)]">健康档案</p>
-              <p className="text-[12px] text-[var(--foreground-secondary)]">
+            <div className="min-w-0 flex-1 overflow-hidden">
+              <p className="text-[15px] font-medium text-[var(--foreground)] whitespace-nowrap truncate">健康档案</p>
+              <p className="text-[12px] text-[var(--foreground-secondary)] whitespace-nowrap truncate">
                 {gestationWeek != null ? `孕 ${gestationWeek} 周` : "记录体重与B超"}
               </p>
             </div>
           </div>
-          <div className="flex gap-2">
-            <div className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5">
-              <Scale className="h-3.5 w-3.5 text-[var(--accent-3)]" strokeWidth={1.5} />
-              <span className="text-[13px] font-medium text-[var(--foreground)]">
+          <div className="flex shrink-0 gap-2 min-w-0">
+            <div className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 whitespace-nowrap overflow-hidden">
+              <Scale className="h-3.5 w-3.5 shrink-0 text-[var(--accent-3)]" strokeWidth={1.5} />
+              <span className="text-[13px] font-medium text-[var(--foreground)] truncate">
                 {latestWeight?.weightKg ?? "—"} kg
               </span>
             </div>
-            <div className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5" title="BPD 双顶径：胎儿头两侧最宽距离（mm），B超常用指标">
-              <Baby className="h-3.5 w-3.5 text-[var(--accent-2)]" strokeWidth={1.5} />
-              <span className="text-[13px] font-medium text-[var(--foreground)]">
+            <div className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 whitespace-nowrap overflow-hidden" title="BPD 双顶径：胎儿头两侧最宽距离（mm），B超常用指标">
+              <Baby className="h-3.5 w-3.5 shrink-0 text-[var(--accent-2)]" strokeWidth={1.5} />
+              <span className="text-[13px] font-medium text-[var(--foreground)] truncate">
                 {bpdMm != null ? `BPD ${bpdMm}mm` : "—"}
               </span>
             </div>

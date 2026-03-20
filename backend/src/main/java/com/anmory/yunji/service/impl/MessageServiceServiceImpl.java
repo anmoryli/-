@@ -1,8 +1,8 @@
 package com.anmory.yunji.service.impl;
 
-import com.anmory.yunji.common.RagService;
 import com.anmory.yunji.entity.Message;
 import com.anmory.yunji.mapper.MessageMapper;
+import com.anmory.yunji.service.EmbedTaskService;
 import com.anmory.yunji.service.MessageService;
 import org.springframework.stereotype.Service;
 
@@ -12,11 +12,11 @@ import java.util.List;
 public class MessageServiceServiceImpl implements MessageService {
 
     private final MessageMapper messageMapper;
-    private final RagService ragService;
+    private final EmbedTaskService embedTaskService;
 
-    public MessageServiceServiceImpl(MessageMapper messageMapper, RagService ragService) {
+    public MessageServiceServiceImpl(MessageMapper messageMapper, EmbedTaskService embedTaskService) {
         this.messageMapper = messageMapper;
-        this.ragService = ragService;
+        this.embedTaskService = embedTaskService;
     }
 
     @Override
@@ -39,7 +39,7 @@ public class MessageServiceServiceImpl implements MessageService {
         msg.setIsAi(isAi);
         messageMapper.insert(msg);
         if (embedInRag && !isAi && content != null && !content.isBlank() && msg.getMessageId() != null) {
-            ragService.embedAsync(userId, content, "message", String.valueOf(msg.getMessageId()));
+            embedTaskService.submitUpsert(userId, content, "message", String.valueOf(msg.getMessageId()));
         }
     }
 

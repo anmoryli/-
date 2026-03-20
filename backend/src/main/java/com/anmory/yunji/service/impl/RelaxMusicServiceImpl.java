@@ -72,13 +72,24 @@ public class RelaxMusicServiceImpl implements RelaxMusicService {
 
     @Override
     public RelaxMusic update(RelaxMusic music) {
-        log.info("更新放松音乐: musicId={}, title={}", music.getMusicId(), music.getTitle());
+        log.info("更新放松音乐: musicId={}", music.getMusicId());
         RelaxMusic existing = relaxMusicMapper.findById(music.getMusicId());
         if (existing == null) {
             log.warn("要更新的放松音乐不存在: musicId={}", music.getMusicId());
             throw new BusinessException(404, "NOT_FOUND", "音乐不存在");
         }
-        relaxMusicMapper.update(music);
+        // 合并：仅用传入的非空字段覆盖，避免部分更新时把 NOT NULL 列置空
+        if (music.getTitle() != null) existing.setTitle(music.getTitle());
+        if (music.getArtist() != null) existing.setArtist(music.getArtist());
+        if (music.getDescription() != null) existing.setDescription(music.getDescription());
+        if (music.getCategory() != null) existing.setCategory(music.getCategory());
+        if (music.getTags() != null) existing.setTags(music.getTags());
+        if (music.getFileUrl() != null) existing.setFileUrl(music.getFileUrl());
+        if (music.getCoverUrl() != null) existing.setCoverUrl(music.getCoverUrl());
+        if (music.getDurationSeconds() != null) existing.setDurationSeconds(music.getDurationSeconds());
+        if (music.getSortOrder() != null) existing.setSortOrder(music.getSortOrder());
+        if (music.getIsEnabled() != null) existing.setIsEnabled(music.getIsEnabled());
+        relaxMusicMapper.update(existing);
         log.info("放松音乐更新成功: musicId={}", music.getMusicId());
         return relaxMusicMapper.findById(music.getMusicId());
     }

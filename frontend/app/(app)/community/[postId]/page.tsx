@@ -171,7 +171,7 @@ export default function CommunityPostDetailPage() {
         className="w-full text-left"
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={post.post.outputImageUrl} alt="效果图" className="w-full cursor-zoom-in" />
+        <img src={post.post.outputImageUrl} alt="效果图" loading="lazy" className="w-full cursor-zoom-in" />
       </button>
 
       <div className="space-y-4 px-4 pt-4">

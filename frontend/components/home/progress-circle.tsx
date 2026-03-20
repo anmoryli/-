@@ -59,11 +59,11 @@ export function ProgressCircle({
           </defs>
         </svg>
         {/* Center content */}
-        <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <p className="text-[11px] font-medium uppercase tracking-widest text-[var(--foreground-muted)]">
+        <div className="absolute inset-0 flex flex-col items-center justify-center min-w-0 px-1">
+          <p className="text-[11px] font-medium uppercase tracking-widest text-[var(--foreground-muted)] whitespace-nowrap">
             孕周
           </p>
-          <p className="mt-0.5 text-2xl font-bold tracking-tight text-[var(--foreground)]">
+          <p className="mt-0.5 text-2xl font-bold tracking-tight text-[var(--foreground)] whitespace-nowrap overflow-hidden text-ellipsis max-w-full">
             {info.weeksPregnant}周{info.daysInCurrentWeek}天
           </p>
           <p className="mt-1 text-sm font-semibold text-[var(--accent-1)]">
@@ -74,10 +74,11 @@ export function ProgressCircle({
       <BabySizeVisual weeksPregnant={info.weeksPregnant} />
       </div>
 
-      {/* 温暖手写风励志文字 */}
+      {/* 温暖手写风励志文字 — 禁止换行，超长省略 */}
       <p
-        className="max-w-[300px] text-center text-[15px] leading-relaxed text-[var(--foreground-secondary)]"
+        className="max-w-[300px] text-center text-[15px] leading-relaxed text-[var(--foreground-secondary)] whitespace-nowrap overflow-hidden text-ellipsis px-2"
         style={{ fontFamily: "var(--font-handwritten)" }}
+        title={motivationalText}
       >
         {motivationalText}
       </p>

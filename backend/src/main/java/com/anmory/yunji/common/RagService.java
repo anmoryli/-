@@ -181,4 +181,41 @@ public class RagService {
             log.warn("RAG embed 调用异常 userId={} source={}", userId, source, e);
         }
     }
+
+    /**
+     * 同步嵌入（供 EmbedTaskRunner 调度器使用，异常向上抛出）
+     */
+    public void embedSync(int userId, String text, String source, String sourceId) throws IOException {
+        if (text == null || text.isBlank()) return;
+        String body = GSON.toJson(Map.of(
+                "user_id", userId,
+                "text", text.trim().length() > 10000 ? text.trim().substring(0, 10000) : text.trim(),
+                "source", source != null ? source : "memo",
+                "source_id", sourceId != null ? sourceId : ""
+        ));
+        Request request = new Request.Builder()
+                .url(BASE_URL + "/api/v1/embed")
+                .post(RequestBody.create(body, JSON))
+                .build();
+        try (Response response = CLIENT.newCall(request).execute()) {
+            if (!response.isSuccessful()) {
+                throw new IOException("RAG embed 失败 code=" + response.code());
+            }
+        }
+    }
+
+    /**
+     * 按 source + source_id 删除向量库中的对应条目
+     */
+    public void deleteBySourceId(String source, String sourceId) throws IOException {
+        String url = BASE_URL + "/api/v1/delete?source="
+                + URLEncoder.encode(source != null ? source : "memo", StandardCharsets.UTF_8)
+                + "&source_id=" + URLEncoder.encode(sourceId != null ? sourceId : "", StandardCharsets.UTF_8);
+        Request request = new Request.Builder().url(url).delete().build();
+        try (Response response = CLIENT.newCall(request).execute()) {
+            if (!response.isSuccessful()) {
+                throw new IOException("RAG delete 失败 code=" + response.code());
+            }
+        }
+    }
 }

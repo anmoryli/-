@@ -5,7 +5,6 @@ import { useParams, useRouter, useSearchParams } from "next/navigation"
 import { ArrowLeft, Upload, Mic, Play, Pause, X } from "lucide-react"
 import { toast } from "sonner"
 import { useAuth } from "@/lib/auth-context"
-import { mutateRecords } from "@/lib/hooks/use-records"
 import {
   getAllEnriched,
   getFamilyEnriched,
@@ -195,7 +194,6 @@ export default function EditRecordPage() {
         visibilityMode,
         (visibilityMode === "allowlist" || visibilityMode === "blocklist") ? visibleTo.join(",") : ""
       )
-      mutateRecords(user?.userId, user?.userType)
       toast.success("修改成功")
       router.push(`/records/${record.id}`)
     } catch (e) {

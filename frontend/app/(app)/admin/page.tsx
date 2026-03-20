@@ -20,6 +20,8 @@ import {
   Upload,
   Power,
   PowerOff,
+  Play,
+  Pause,
 } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import {
@@ -49,6 +51,7 @@ import {
   deleteRelaxMusic,
   type RelaxMusic,
 } from "@/lib/api/relax-music"
+import { useMusicPlayer } from "@/lib/music-player-context"
 import {
   Dialog,
   DialogContent,
@@ -361,6 +364,29 @@ export default function AdminPage() {
       toast.error(e instanceof Error ? e.message : "上传失败")
     } finally {
       setMusicUploading(false)
+    }
+  }
+
+  const player = useMusicPlayer()
+
+  const handleMusicPlay = (music: RelaxMusic) => {
+    if (!music.fileUrl) {
+      toast.error("音频地址无效")
+      return
+    }
+    if (player.track?.musicId === music.musicId && player.isPlaying) {
+      player.pause()
+    } else if (player.track?.musicId === music.musicId) {
+      player.resume()
+    } else {
+      player.play({
+        musicId: music.musicId,
+        title: music.title,
+        artist: music.artist,
+        fileUrl: music.fileUrl,
+        coverUrl: music.coverUrl,
+        durationSeconds: music.durationSeconds,
+      })
     }
   }
 
@@ -732,6 +758,18 @@ export default function AdminPage() {
                     </p>
                   </div>
                   <div className="flex shrink-0 gap-1.5">
+                    <button
+                      onClick={() => handleMusicPlay(m)}
+                      className="rounded-lg border border-[var(--accent-1)]/30 p-2 text-[var(--accent-1)] hover:bg-[var(--accent-1-muted)] transition-colors"
+                      aria-label="播放预览"
+                      title="播放预览"
+                    >
+                      {player.track?.musicId === m.musicId && player.isPlaying ? (
+                        <Pause className="h-4 w-4" strokeWidth={1.75} />
+                      ) : (
+                        <Play className="h-4 w-4" strokeWidth={1.75} />
+                      )}
+                    </button>
                     <button
                       onClick={() => handleMusicToggle(m)}
                       className={cn(

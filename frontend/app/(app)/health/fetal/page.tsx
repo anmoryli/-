@@ -1,11 +1,10 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useBack } from "@/lib/use-back"
-import { ArrowLeft, Plus, Ruler, MessageSquare } from "lucide-react"
+import { ArrowLeft, Plus, Ruler, MessageSquare, FileUp } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
-import { mutateFetalRecords } from "@/lib/hooks/use-health"
-import { addFetalRecord, listFetalRecords, getAnalysisByRecord, getHealthSummary } from "@/lib/api/health"
+import { addFetalRecord, listFetalRecords, getAnalysisByRecord, getHealthSummary, type FetalUltrasoundRecord } from "@/lib/api/health"
 import { toast } from "sonner"
 import {
   Dialog,
@@ -52,6 +51,8 @@ export default function FetalPage() {
   const [efwG, setEfwG] = useState("")
   const [note, setNote] = useState("")
   const [saving, setSaving] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const canSave = useMemo(() => !!user?.userId && gestationWeek != null, [user?.userId, gestationWeek])
 
@@ -103,6 +104,44 @@ export default function FetalPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.userId])
 
+  const onUploadPdf = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !user?.userId) return
+    const name = file.name || ""
+    if (!name.toLowerCase().endsWith(".pdf")) {
+      toast.error("请选择 PDF 文件")
+      e.target.value = ""
+      return
+    }
+    setUploading(true)
+    try {
+      const formData = new FormData()
+      formData.append("file", file)
+      formData.append("userId", String(user.userId))
+      const res = await fetch("/api/parse-fetal-pdf", { method: "POST", body: formData })
+      const json = await res.json()
+      const data = res.ok && json?.code === 200 ? (json.data as FetalUltrasoundRecord) : null
+      if (data) {
+        setRecordDate(data.recordDate ?? todayISO())
+        setGestationWeek(data.gestationWeek ?? null)
+        setBpdMm(data.bpdMm != null ? String(data.bpdMm) : "")
+        setHcMm(data.hcMm != null ? String(data.hcMm) : "")
+        setAcMm(data.acMm != null ? String(data.acMm) : "")
+        setFlMm(data.flMm != null ? String(data.flMm) : "")
+        setEfwG(data.efwG != null ? String(data.efwG) : "")
+        setNote(data.note ?? "")
+        toast.success("已解析，请核对后点击「记录B超数据」保存")
+      } else {
+        toast.error("解析失败，请尝试手动录入")
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "解析失败，请检查网络或尝试手动录入")
+    } finally {
+      setUploading(false)
+      e.target.value = ""
+    }
+  }
+
   const onAdd = async () => {
     if (!user?.userId || !canSave) return
     setSaving(true)
@@ -118,7 +157,6 @@ export default function FetalPage() {
         efwG: efwG ? Number(efwG) : undefined,
         note: note || undefined,
       })
-      mutateFetalRecords(user?.userId)
       toast.success("已记录。健康建议生成中，请稍后到「我的」→「健康档案」查看")
       setBpdMm("")
       setHcMm("")
@@ -149,8 +187,36 @@ export default function FetalPage() {
       <div className="px-4 pb-24">
         <div className="glass-card overflow-hidden">
           <div className="flex items-center gap-2 border-b border-[var(--card-border)] px-4 py-3">
+            <FileUp className="h-4 w-4 text-[var(--accent-2)]" />
+            <p className="text-sm font-semibold text-[var(--foreground)]">上传 B超 PDF</p>
+          </div>
+          <div className="px-4 py-3">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf,application/pdf"
+              onChange={onUploadPdf}
+              className="hidden"
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={!user?.userId || uploading}
+              className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-[var(--card-border)] py-4 text-sm font-medium text-[var(--foreground-secondary)] transition-colors hover:border-[var(--accent-2)] hover:text-[var(--accent-2)] disabled:opacity-50 active:opacity-80"
+            >
+              <FileUp className="h-5 w-5" />
+              {uploading ? "解析中…" : "选择 PDF 文件，解析后填入下方表单"}
+            </button>
+            <p className="mt-2 text-center text-xs text-[var(--foreground-muted)]">
+              支持表格型 B超报告，扫描件将提取图片供 AI 识别
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-4 glass-card overflow-hidden">
+          <div className="flex items-center gap-2 border-b border-[var(--card-border)] px-4 py-3">
             <Ruler className="h-4 w-4 text-[var(--accent-2)]" />
-            <p className="text-sm font-semibold text-[var(--foreground)]">新增记录</p>
+            <p className="text-sm font-semibold text-[var(--foreground)]">手动录入</p>
           </div>
           <div className="grid gap-3 px-4 py-4">
             <div className="grid grid-cols-2 gap-3">
@@ -163,10 +229,12 @@ export default function FetalPage() {
                   className="h-10 rounded-xl border border-[var(--card-border)] bg-[var(--background-alt)] px-3 text-sm text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--ring)]"
                 />
               </label>
-              <label className="grid gap-1">
+              <label className="grid gap-1 min-w-0">
                 <span className="text-xs text-[var(--foreground-secondary)]">当前孕周</span>
-                <div className="flex h-10 items-center rounded-xl border border-[var(--card-border)] bg-[var(--background-alt)] px-3 text-sm text-[var(--foreground)]">
-                  {gestationWeek != null ? `孕 ${gestationWeek} 周` : "请先在「我的」设置末次月经或预产期"}
+                <div className="flex h-10 min-w-0 items-center rounded-xl border border-[var(--card-border)] bg-[var(--background-alt)] px-3 text-sm text-[var(--foreground)]">
+                  <span className="truncate whitespace-nowrap" title={gestationWeek != null ? `孕 ${gestationWeek} 周` : "请先在「我的」设置末次月经或预产期"}>
+                    {gestationWeek != null ? `孕 ${gestationWeek} 周` : "请先在「我的」设置末次月经或预产期"}
+                  </span>
                 </div>
               </label>
             </div>
@@ -242,16 +310,17 @@ export default function FetalPage() {
                 const refMetric = reference ? (reference[key] as Record<string, unknown> | null) : null
                 const range = refMetric?.range as Record<string, unknown> | undefined
                 if (v == null && !range) return null
+                const subText = `你的值：${v ?? "—"} ${unit}${range?.min != null && range?.max != null ? ` · 参考：${String(range.min)}~${String(range.max)}` : ""}`
                 return (
                   <div className="flex items-center justify-between gap-2 rounded-xl border border-[var(--card-border)] bg-[var(--background-alt)] px-3 py-2">
-                    <div className="min-w-0">
-                      <p className="text-xs font-semibold text-[var(--foreground)]">{label}</p>
-                      <p className="mt-0.5 text-[11px] text-[var(--foreground-secondary)]">
+                    <div className="min-w-0 flex-1 overflow-hidden">
+                      <p className="text-xs font-semibold text-[var(--foreground)] whitespace-nowrap truncate">{label}</p>
+                      <p className="mt-0.5 text-[11px] text-[var(--foreground-secondary)] truncate whitespace-nowrap" title={subText}>
                         你的值：{v ?? "—"} {unit}
                         {range?.min != null && range?.max != null ? ` · 参考：${String(range.min)}~${String(range.max)}` : ""}
                       </p>
                     </div>
-                    <span className={`shrink-0 rounded-full px-2 py-1 text-[11px] font-semibold ${m.cls}`}>{m.label}</span>
+                    <span className={`shrink-0 rounded-full px-2 py-1 text-[11px] font-semibold whitespace-nowrap ${m.cls}`}>{m.label}</span>
                   </div>
                 )
               }
@@ -262,12 +331,12 @@ export default function FetalPage() {
                   className={idx > 0 ? "border-t border-[var(--card-border)]" : ""}
                 >
                   <div className="flex items-center justify-between gap-2 px-4 py-3">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-[var(--foreground)]">
+                    <div className="min-w-0 flex-1 overflow-hidden">
+                      <p className="truncate text-sm font-semibold text-[var(--foreground)] whitespace-nowrap">
                         {(record.recordDate as string) ?? "—"}{" "}
                         {record.gestationWeek ? `· 孕${record.gestationWeek}周` : ""}
                       </p>
-                      <p className="mt-0.5 text-xs text-[var(--foreground-secondary)]">
+                      <p className="mt-0.5 text-xs text-[var(--foreground-secondary)] whitespace-nowrap truncate">
                         可对照：基准 ±10%（用于趋势自查）
                       </p>
                     </div>

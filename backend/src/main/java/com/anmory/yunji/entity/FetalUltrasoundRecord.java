@@ -18,6 +18,7 @@ public class FetalUltrasoundRecord {
     private BigDecimal flMm;
     private Integer efwG;
     private String note;
+    private String fileUrl;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

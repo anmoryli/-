@@ -79,12 +79,12 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
     if (!audio) return
 
     if (track?.musicId === newTrack.musicId && audio.src) {
-      audio.play().catch(() => {})
+      audio.play().catch((e) => console.warn("[MusicPlayer] resume failed:", e))
     } else {
+      setTrack(newTrack)
       audio.src = newTrack.fileUrl
       audio.load()
-      audio.play().catch(() => {})
-      setTrack(newTrack)
+      audio.play().catch((e) => console.warn("[MusicPlayer] load/play failed:", e))
       setCurrentTime(0)
     }
     setVisible(true)

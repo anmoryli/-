@@ -81,6 +81,31 @@ public class AliOssUtil {
     }
 
     /**
+     * 生成 PDF 内嵌图片 ObjectKey（B超/产检扫描件抽取）
+     */
+    private String generatePdfImageObjectKey(Integer userId, String suffix) {
+        String safeSuffix = (suffix == null || suffix.isBlank()) ? ".png" : suffix;
+        if (!safeSuffix.startsWith(".")) {
+            safeSuffix = "." + safeSuffix;
+        }
+        String uniqueFileName = UUID.randomUUID() + safeSuffix;
+        return "yunji/" + userId + "/pdf-image/" + uniqueFileName;
+    }
+
+    /**
+     * 上传 PDF 内嵌图片（B超/产检扫描件抽取后供 AI Vision 解析）
+     */
+    public String uploadPdfImage(Integer userId, byte[] imageBytes, String suffix) {
+        try {
+            String objectKey = generatePdfImageObjectKey(userId, suffix);
+            return upload(imageBytes, objectKey);
+        } catch (Exception e) {
+            log.error("PDF 内嵌图片上传失败", e);
+            throw new RuntimeException("PDF 图片上传失败");
+        }
+    }
+
+    /**
      * 生成 AI 聊天图片 ObjectKey（用户上传图 / AI 生成图）
      */
     private String generateChatImageObjectKey(Integer userId, String suffix) {

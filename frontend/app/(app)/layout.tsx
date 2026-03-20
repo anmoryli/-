@@ -4,7 +4,6 @@ import { useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { BottomNav } from "@/components/bottom-nav"
 import { AuthProvider, useAuth } from "@/lib/auth-context"
-import { SWRProvider } from "@/lib/swr-config"
 import { MusicPlayerProvider } from "@/lib/music-player-context"
 import { GlobalMusicPlayer } from "@/components/global-music-player"
 
@@ -55,9 +54,7 @@ export default function AppLayout({
 }) {
   return (
     <AuthProvider>
-      <SWRProvider>
-        <AuthGuard>{children}</AuthGuard>
-      </SWRProvider>
+      <AuthGuard>{children}</AuthGuard>
     </AuthProvider>
   )
 }

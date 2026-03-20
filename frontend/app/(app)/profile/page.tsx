@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { addMonths } from "date-fns"
 import {
@@ -27,9 +27,9 @@ import {
 } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import { updatePregnancy, updateUsername, uploadAvatar, updateAvatar } from "@/lib/api/user"
-import { useRecords } from "@/lib/hooks/use-records"
-import { useUnreadCount } from "@/lib/hooks/use-notifications"
-import { useCreatorPregnancy } from "@/lib/hooks/use-family"
+import { getAllEnriched, getFamilyEnriched, type MemoItem } from "@/lib/api/memo"
+import { getUnreadCount } from "@/lib/api/notifications"
+import { getCreatorPregnancy, type CreatorPregnancyInfo } from "@/lib/api/family"
 import { getPregnancyInfo } from "@/lib/pregnancy"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import {
@@ -70,11 +70,32 @@ export default function ProfilePage() {
     user?.pregnancyTime ? user.pregnancyTime.slice(0, 10) : ""
   )
   const [saving, setSaving] = useState(false)
+  const [records, setRecords] = useState<MemoItem[]>([])
+  const [loadingRecords, setLoadingRecords] = useState(true)
+  const [unreadCount, setUnreadCount] = useState(0)
+  const [creatorPregnancy, setCreatorPregnancy] = useState<CreatorPregnancyInfo | null>(null)
 
-  const { data: records = [], isLoading: loadingRecords } = useRecords(user?.userId, user?.userType)
-  const { data: unreadCount = 0 } = useUnreadCount(user?.userId)
-  const shouldFetchPregnancy = user?.userType === "family_member" || user?.userType === "pregnant"
-  const { data: creatorPregnancy = null } = useCreatorPregnancy(shouldFetchPregnancy ? user?.userId : undefined)
+  useEffect(() => {
+    if (!user?.userId) return
+    getUnreadCount(user.userId).then((n) => setUnreadCount(n ?? 0)).catch(() => setUnreadCount(0))
+  }, [user?.userId])
+
+  useEffect(() => {
+    if (!user?.userId) return
+    const shouldFetch = user.userType === "family_member" || user.userType === "pregnant"
+    if (shouldFetch) {
+      getCreatorPregnancy(user.userId).then((p) => setCreatorPregnancy(p ?? null)).catch(() => setCreatorPregnancy(null))
+    } else {
+      setCreatorPregnancy(null)
+    }
+  }, [user?.userId, user?.userType])
+
+  useEffect(() => {
+    if (!user?.userId) return
+    setLoadingRecords(true)
+    const list = user.userType === "family_member" ? getFamilyEnriched(user.userId) : getAllEnriched(user.userId)
+    list.then((r) => setRecords(r ?? [])).catch(() => setRecords([])).finally(() => setLoadingRecords(false))
+  }, [user?.userId, user?.userType])
 
   if (!user) return null
 
@@ -222,16 +243,18 @@ export default function ProfilePage() {
             >
               {user.username}
             </h1>
-            <div className="mt-1 flex flex-wrap items-center gap-3 text-caption">
+            <div className="mt-1 flex flex-wrap items-center gap-3 text-caption min-w-0">
               <span className="shrink-0 whitespace-nowrap rounded-full bg-[var(--accent-1-muted)] px-2 py-0.5 text-xs text-[var(--accent-1)]">
                 {user.userType === "family_member" ? "家庭成员·仅查看" : "孕妇本人·可记录"}
               </span>
               {info && (
-                <span className="flex items-center gap-1">
-                  <Calendar className="h-3.5 w-3.5" strokeWidth={1.75} />
-                  {user.userType === "family_member" && creatorPregnancy
-                    ? `${creatorPregnancy.creatorUsername} 的预产期 ${info.dueDateFormatted}`
-                    : `预产期 ${info.dueDateFormatted}`}
+                <span className="flex min-w-0 shrink items-center gap-1 overflow-hidden">
+                  <Calendar className="h-3.5 w-3.5 shrink-0" strokeWidth={1.75} />
+                  <span className="truncate whitespace-nowrap" title={user.userType === "family_member" && creatorPregnancy ? `${creatorPregnancy.creatorUsername} 的预产期 ${info.dueDateFormatted}` : `预产期 ${info.dueDateFormatted}`}>
+                    {user.userType === "family_member" && creatorPregnancy
+                      ? `${creatorPregnancy.creatorUsername} 的预产期 ${info.dueDateFormatted}`
+                      : `预产期 ${info.dueDateFormatted}`}
+                  </span>
                 </span>
               )}
             </div>
@@ -360,14 +383,15 @@ export default function ProfilePage() {
                 <Icon className="h-5 w-5" strokeWidth={1.75} />
               </div>
               <span
-                className={`min-w-0 max-w-full break-words text-center font-bold text-[var(--foreground)] ${isRecordStat ? "text-sm leading-tight" : "text-[1.25rem]"}`}
+                className={`min-w-0 max-w-full text-center font-bold text-[var(--foreground)] truncate block ${isRecordStat ? "text-sm leading-tight" : "text-[1.25rem]"}`}
+                title={typeof stat.value === "string" ? stat.value : String(stat.value)}
               >
                 {stat.value}
                 {stat.suffix && stat.value !== "-" && (
                   <span className="text-caption font-normal">{stat.suffix}</span>
                 )}
               </span>
-              <span className="text-micro shrink-0">{stat.label}</span>
+              <span className="text-micro shrink-0 whitespace-nowrap">{stat.label}</span>
               </div>
             )
           })}
@@ -377,16 +401,16 @@ export default function ProfilePage() {
       {/* Pregnancy Progress Card — 孕妇本人或家庭成员（展示孕妇进度） */}
       {info && (user.userType === "pregnant" || creatorPregnancy) && (
         <div className="card-elevated mt-6 overflow-hidden rounded-lg p-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-[15px] font-medium text-[var(--foreground)]">
+          <div className="flex items-center justify-between gap-2 min-w-0">
+            <div className="min-w-0 flex-1 overflow-hidden">
+              <p className="text-[15px] font-medium text-[var(--foreground)] whitespace-nowrap overflow-hidden text-ellipsis">
                 {user.userType === "family_member" && creatorPregnancy ? "孕妇的怀孕进度" : "孕期进度"}
               </p>
-              <p className="mt-0.5 text-caption">
+              <p className="mt-0.5 text-caption whitespace-nowrap overflow-hidden text-ellipsis">
                 第{info.weeksPregnant}周{info.daysInCurrentWeek}天 · 第{info.trimester}孕期
               </p>
             </div>
-            <span className="text-2xl font-bold text-[var(--accent-1)]">
+            <span className="text-2xl font-bold text-[var(--accent-1)] shrink-0 whitespace-nowrap">
               {Math.round(info.progress)}%
             </span>
           </div>
@@ -397,8 +421,8 @@ export default function ProfilePage() {
             />
           </div>
           <div className="mt-2 flex justify-between text-micro">
-            <span>怀孕第1天</span>
-            <span>预产期</span>
+            <span className="whitespace-nowrap shrink-0">怀孕第1天</span>
+            <span className="whitespace-nowrap shrink-0">预产期</span>
           </div>
         </div>
       )}

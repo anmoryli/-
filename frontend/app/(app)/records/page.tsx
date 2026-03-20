@@ -27,10 +27,11 @@ import {
   deleteVoice,
   deleteFile,
   exportPdfToEmail,
+  getAllEnrichedPaged,
+  getFamilyEnriched,
   type MemoItem,
 } from "@/lib/api/memo"
-import { useRecords, mutateRecords } from "@/lib/hooks/use-records"
-import { useMyFamily, useFamilyMembers } from "@/lib/hooks/use-family"
+import { getMyFamily, getFamilyMembers, type Family, type FamilyMember } from "@/lib/api/family"
 import { getPregnancyInfo } from "@/lib/pregnancy"
 import {
   DropdownMenu,
@@ -178,16 +179,114 @@ export default function RecordsPage() {
   const [exportSubmitting, setExportSubmitting] = useState(false)
   const timelineContainerRef = useRef<HTMLDivElement>(null)
 
+  const [family, setFamily] = useState<Family | null>(null)
+  const [members, setMembers] = useState<FamilyMember[]>([])
+  const [records, setRecords] = useState<MemoItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [page, setPage] = useState(1)
+  const [hasMore, setHasMore] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const sentinelRef = useRef<HTMLDivElement>(null)
+  const PAGE_SIZE = 20
+
   const isFamilyMember = user?.userType === "family_member"
   const canAddRecord = !isFamilyMember || !!user?.isSpouse
 
-  const { data: family } = useMyFamily(user?.userId)
-  const { data: members = [] } = useFamilyMembers(family?.familyId, user?.userId)
-
   const hasSpouse = members.some((m) => m.isSpouse)
   const hasFamilyTwo = !!family && hasSpouse
+  const usePaged = !hasFamilyTwo && user?.userType !== "family_member"
 
-  const { data: records = [], isLoading: loading } = useRecords(user?.userId, user?.userType, hasFamilyTwo)
+  const fetchRecords = useCallback(async () => {
+    if (!user?.userId) return
+    setLoading(true)
+    setPage(1)
+    setHasMore(true)
+    try {
+      if (user.userType === "family_member" || hasFamilyTwo) {
+        const list = await getFamilyEnriched(user.userId)
+        setRecords(list ?? [])
+        setHasMore(false)
+      } else {
+        const list = await getAllEnrichedPaged(user.userId, 1, PAGE_SIZE, user.userId)
+        setRecords(list ?? [])
+        setHasMore((list?.length ?? 0) >= PAGE_SIZE)
+      }
+    } catch {
+      setRecords([])
+      setHasMore(false)
+    } finally {
+      setLoading(false)
+    }
+  }, [user?.userId, user?.userType, hasFamilyTwo])
+
+  const loadMore = useCallback(async () => {
+    if (!user?.userId || !usePaged || loadingMore || !hasMore) return
+    setLoadingMore(true)
+    try {
+      const nextPage = page + 1
+      const list = await getAllEnrichedPaged(user.userId, nextPage, PAGE_SIZE, user.userId)
+      setRecords((prev) => [...prev, ...(list ?? [])])
+      setPage(nextPage)
+      setHasMore((list?.length ?? 0) >= PAGE_SIZE)
+    } catch {
+      setHasMore(false)
+    } finally {
+      setLoadingMore(false)
+    }
+  }, [user?.userId, usePaged, loadingMore, hasMore, page])
+
+  useEffect(() => {
+    if (!user?.userId) return
+    let cancelled = false
+    setLoading(true)
+    const run = async () => {
+      try {
+        const f = await getMyFamily(user.userId)
+        if (cancelled) return
+        setFamily(f ?? null)
+        let m: FamilyMember[] = []
+        if (f?.familyId) {
+          m = await getFamilyMembers(f.familyId, user.userId)
+          if (cancelled) return
+          setMembers(m ?? [])
+        }
+        const hf = !!f && m.some((x) => x.isSpouse)
+        if (user.userType === "family_member" || hf) {
+          const list = await getFamilyEnriched(user.userId)
+          if (cancelled) return
+          setRecords(list ?? [])
+          setHasMore(false)
+        } else {
+          const list = await getAllEnrichedPaged(user.userId, 1, PAGE_SIZE, user.userId)
+          if (cancelled) return
+          setRecords(list ?? [])
+          setPage(1)
+          setHasMore((list?.length ?? 0) >= PAGE_SIZE)
+        }
+      } catch {
+        if (!cancelled) setRecords([])
+        if (!cancelled) setHasMore(false)
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+    run()
+    return () => { cancelled = true }
+  }, [user?.userId, user?.userType])
+
+  useEffect(() => {
+    if (!usePaged || !hasMore || loadingMore) return
+    const el = sentinelRef.current
+    if (!el) return
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting && hasMore && !loadingMore) loadMore()
+      },
+      { rootMargin: "300px" }
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [usePaged, hasMore, loadingMore, loadMore])
   const creator = members.find((m) => m.role === "creator")
   const creatorUserId = isFamilyMember && family ? family.creatorUserId : (user?.userId ?? null)
   const creatorUsername = isFamilyMember ? (creator?.username || "家人") : (user?.username || "用户")
@@ -241,12 +340,12 @@ export default function RecordsPage() {
             break
         }
         toast.success("记录已删除")
-        mutateRecords(user?.userId, user?.userType, hasFamilyTwo)
+        fetchRecords()
       } catch {
         toast.error("删除失败")
       }
     },
-    [user?.userId, user?.userType, hasFamilyTwo]
+    [user?.userId, user?.userType, hasFamilyTwo, fetchRecords]
   )
 
   const recordByFiltered =
@@ -454,22 +553,22 @@ export default function RecordsPage() {
         </div>
       )}
 
-      {/* 日期筛选 */}
+      {/* 日期筛选 — 禁止换行 */}
       {sortedDates.length > 0 && (
-        <div className="mt-4 flex flex-wrap items-center gap-2 rounded-xl border border-white/40 px-3 py-2" style={{ background: "rgba(255,255,255,0.45)", backdropFilter: "blur(16px) saturate(1.2)", WebkitBackdropFilter: "blur(16px) saturate(1.2)" }}>
+        <div className="mt-4 flex flex-nowrap items-center gap-2 overflow-x-auto rounded-xl border border-white/40 px-3 py-2 scrollbar-hide" style={{ background: "rgba(255,255,255,0.45)", backdropFilter: "blur(16px) saturate(1.2)", WebkitBackdropFilter: "blur(16px) saturate(1.2)" }}>
           <Calendar className="h-4 w-4 shrink-0 text-[var(--accent-1)]" strokeWidth={1.75} />
           <input
             type="date"
             value={dateRangeFrom}
             onChange={(e) => setDateRangeFrom(e.target.value)}
-            className="min-w-[160px] flex-1 rounded-lg border border-[var(--accent-1)]/20 bg-white/60 px-3 py-2 text-[13px] text-[var(--foreground)] outline-none focus:border-[var(--accent-1)]/50 [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+            className="min-w-0 flex-1 shrink-0 rounded-lg border border-[var(--accent-1)]/20 bg-white/60 px-3 py-2 text-[13px] text-[var(--foreground)] outline-none focus:border-[var(--accent-1)]/50 [&::-webkit-calendar-picker-indicator]:cursor-pointer"
           />
-          <span className="shrink-0 text-[12px] text-[var(--foreground-muted)]">至</span>
+          <span className="shrink-0 text-[12px] text-[var(--foreground-muted)] whitespace-nowrap">至</span>
           <input
             type="date"
             value={dateRangeTo}
             onChange={(e) => setDateRangeTo(e.target.value)}
-            className="min-w-[160px] flex-1 rounded-lg border border-[var(--accent-1)]/20 bg-white/60 px-3 py-2 text-[13px] text-[var(--foreground)] outline-none focus:border-[var(--accent-1)]/50 [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+            className="min-w-0 flex-1 shrink-0 rounded-lg border border-[var(--accent-1)]/20 bg-white/60 px-3 py-2 text-[13px] text-[var(--foreground)] outline-none focus:border-[var(--accent-1)]/50 [&::-webkit-calendar-picker-indicator]:cursor-pointer"
           />
           <DateRangeShare
             userId={creatorUserId ?? user!.userId}
@@ -703,15 +802,15 @@ export default function RecordsPage() {
 
               return (
                 <div key={dateStr} className="mb-6 animate-in fade-in duration-300">
-                  <div className="flex flex-wrap items-baseline justify-center gap-2 py-3 px-6">
-                    <p className="text-[15px] font-medium text-[var(--foreground)]" style={{ fontFamily: "var(--font-serif)" }}>
+                  <div className="flex flex-nowrap items-baseline justify-center gap-2 overflow-x-auto py-3 px-6 scrollbar-hide">
+                    <p className="text-[15px] font-medium text-[var(--foreground)] whitespace-nowrap shrink-0" style={{ fontFamily: "var(--font-serif)" }}>
                       {dateStr === "未知" ? "未知日期" : format(new Date(dateStr), "M月d日 EEEE", { locale: zhCN })}
                     </p>
                     {weekLabel && (
-                      <span className="rounded-full bg-[var(--accent-1-muted)] px-2.5 py-1 text-[11px] font-medium text-[var(--accent-1)]">{weekLabel}</span>
+                      <span className="rounded-full bg-[var(--accent-1-muted)] px-2.5 py-1 text-[11px] font-medium text-[var(--accent-1)] whitespace-nowrap shrink-0">{weekLabel}</span>
                     )}
                     {items.find((it) => it.recordWeightKg != null)?.recordWeightKg != null && (
-                      <span className="rounded-full bg-[var(--accent-2-muted)] px-2.5 py-1 text-[11px] font-medium text-[var(--accent-2)]">
+                      <span className="rounded-full bg-[var(--accent-2-muted)] px-2.5 py-1 text-[11px] font-medium text-[var(--accent-2)] whitespace-nowrap shrink-0">
                         体重 {items.find((it) => it.recordWeightKg != null)?.recordWeightKg}kg
                       </span>
                     )}
@@ -748,6 +847,13 @@ export default function RecordsPage() {
                 </div>
               )
             })}
+            {usePaged && hasMore && (
+              <div ref={sentinelRef} className="py-8 flex justify-center">
+                {loadingMore && (
+                  <span className="text-sm text-[var(--foreground-muted)]">加载更多...</span>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>

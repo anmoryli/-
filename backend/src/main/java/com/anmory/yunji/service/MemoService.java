@@ -70,4 +70,9 @@ public interface MemoService {
      * 按 memoId 查询单条记录，仅当 requestUserId 有权限查看时返回，否则返回 null。
      */
     Memo getMemoByIdIfVisible(Integer memoId, Integer requestUserId);
+
+    List<Text> getTextByMemoIds(List<Integer> memoIds);
+    List<Voice> getVoiceByMemoIds(List<Integer> memoIds);
+    List<Photo> getPhotoByMemoIds(List<Integer> memoIds);
+    List<File> getFileByMemoIds(List<Integer> memoIds);
 }

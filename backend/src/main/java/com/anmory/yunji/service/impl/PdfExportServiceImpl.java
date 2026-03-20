@@ -238,7 +238,6 @@ public class PdfExportServiceImpl implements PdfExportService {
         List<Voice> voices = memoService.getVoiceByUserId(userId);
         List<Photo> photos = memoService.getPhotoByUserId(userId);
         List<File> files = memoService.getFileByUserId(userId);
-
         Map<Integer, Text> textByMemo = (texts != null ? texts : List.<Text>of()).stream().collect(Collectors.toMap(Text::getMemoId, t -> t));
         Map<Integer, Voice> voiceByMemo = (voices != null ? voices : List.<Voice>of()).stream().collect(Collectors.toMap(Voice::getMemoId, v -> v));
         Map<Integer, List<String>> photoUrlsByMemo = new HashMap<>();
@@ -263,7 +262,39 @@ public class PdfExportServiceImpl implements PdfExportService {
                 }
             }
         }
+        return buildEnrichedList(memos, textByMemo, voiceByMemo, photoUrlsByMemo, photoDescByMemo, fileByMemo, weightByDate);
+    }
 
+    @Override
+    public List<EnrichedMemoItem> loadEnrichedItemsPaged(Integer userId, Integer requestUserId, int page, int pageSize) {
+        int offset = (page - 1) * pageSize;
+        List<Memo> memos = memoService.getAllMemoByUserIdPaged(userId, requestUserId, pageSize, offset);
+        if (memos == null || memos.isEmpty()) return List.of();
+        List<Integer> memoIds = memos.stream().map(Memo::getMemoId).filter(java.util.Objects::nonNull).distinct().toList();
+        List<Text> texts = memoService.getTextByMemoIds(memoIds);
+        List<Voice> voices = memoService.getVoiceByMemoIds(memoIds);
+        List<Photo> photos = memoService.getPhotoByMemoIds(memoIds);
+        List<File> files = memoService.getFileByMemoIds(memoIds);
+        Map<Integer, Text> textByMemo = (texts != null ? texts : List.<Text>of()).stream().collect(Collectors.toMap(Text::getMemoId, t -> t));
+        Map<Integer, Voice> voiceByMemo = (voices != null ? voices : List.<Voice>of()).stream().collect(Collectors.toMap(Voice::getMemoId, v -> v));
+        Map<Integer, List<String>> photoUrlsByMemo = new HashMap<>();
+        if (photos != null) {
+            for (Photo p : photos) {
+                String url = p.getUrl();
+                if (url != null && !url.isEmpty()) {
+                    photoUrlsByMemo.computeIfAbsent(p.getMemoId(), k -> new ArrayList<>()).add(url);
+                }
+            }
+        }
+        Map<Integer, String> photoDescByMemo = (photos != null ? photos : List.<Photo>of()).stream()
+                .filter(p -> p.getPhotoDescription() != null)
+                .collect(Collectors.toMap(Photo::getMemoId, Photo::getPhotoDescription, (a, b) -> a));
+        Map<Integer, File> fileByMemo = (files != null ? files : List.<File>of()).stream().collect(Collectors.toMap(File::getMemoId, f -> f));
+        return buildEnrichedList(memos, textByMemo, voiceByMemo, photoUrlsByMemo, photoDescByMemo, fileByMemo, Map.of());
+    }
+
+    private List<EnrichedMemoItem> buildEnrichedList(List<Memo> memos,
+            Map<Integer, Text> textByMemo, Map<Integer, Voice> voiceByMemo, Map<Integer, List<String>> photoUrlsByMemo, Map<Integer, String> photoDescByMemo, Map<Integer, File> fileByMemo, Map<LocalDate, Double> weightByDate) {
         List<EnrichedMemoItem> result = new ArrayList<>();
         for (Memo m : (memos != null ? memos : List.<Memo>of())) {
             EnrichedMemoItem item = new EnrichedMemoItem();

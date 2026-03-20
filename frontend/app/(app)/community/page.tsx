@@ -105,6 +105,7 @@ export default function CommunityPage() {
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={item.post.outputImageUrl}
+                    loading="lazy"
                     alt="AI 生成效果"
                     className="w-full object-cover"
                     style={{ maxHeight: 260 }}

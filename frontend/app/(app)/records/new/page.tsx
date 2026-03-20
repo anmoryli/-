@@ -8,7 +8,6 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { useAuth } from "@/lib/auth-context"
-import { mutateRecords } from "@/lib/hooks/use-records"
 import { addText, addPhoto, addVoice, addFile, inspireMemo } from "@/lib/api/memo"
 import { getMyFamily, getFamilyMembers, type FamilyMember } from "@/lib/api/family"
 import { getTodayLog, updateWeight } from "@/lib/api/daily"
@@ -321,7 +320,6 @@ export default function NewRecordPage() {
           break
       }
 
-      mutateRecords(user?.userId, user?.userType)
       setShowSuccessAnim(true)
       setTimeout(() => {
         toast.success("记录已保存")

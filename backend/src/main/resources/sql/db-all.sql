@@ -83,18 +83,7 @@ CREATE TABLE photo (
                        FOREIGN KEY (memo_id) REFERENCES memo(memo_id) ON DELETE CASCADE
 );
 
--- 7. 照片-备忘录关联表
-CREATE TABLE memo_photo (
-                            memo_photo_id INT PRIMARY KEY AUTO_INCREMENT NOT NULL,
-                            memo_id INT NOT NULL,
-                            photo_id INT NOT NULL,
-                            created_at DATETIME DEFAULT NOW(),
-                            updated_at DATETIME DEFAULT NOW() ON UPDATE NOW(),
-                            FOREIGN KEY (memo_id) REFERENCES memo(memo_id) ON DELETE CASCADE,
-                            FOREIGN KEY (photo_id) REFERENCES photo(photo_id) ON DELETE CASCADE
-);
-
--- 8. AI 对话会话表
+-- 7. AI 对话会话表
 CREATE TABLE conversation (
                               conversation_id INT NOT NULL PRIMARY KEY AUTO_INCREMENT,
                               user_id INT NOT NULL,
@@ -133,20 +122,7 @@ CREATE TABLE user_daily_log (
                                 UNIQUE KEY uk_user_date (user_id, record_date)
 );
 
--- 11. 产检清单勾选（可选）
-CREATE TABLE prenatal_checklist (
-                                    checklist_id INT PRIMARY KEY AUTO_INCREMENT NOT NULL,
-                                    user_id INT NOT NULL,
-                                    milestone_key VARCHAR(50) NOT NULL,
-                                    completed TINYINT(1) DEFAULT 0,
-                                    completed_at DATETIME NULL,
-                                    created_at DATETIME DEFAULT NOW(),
-                                    updated_at DATETIME DEFAULT NOW() ON UPDATE NOW(),
-                                    FOREIGN KEY (user_id) REFERENCES user(user_id) ON DELETE CASCADE,
-                                    UNIQUE KEY uk_user_milestone (user_id, milestone_key)
-);
-
--- 12. 宫缩记录
+-- 11. 宫缩记录
 CREATE TABLE contraction (
                              contraction_id INT PRIMARY KEY AUTO_INCREMENT NOT NULL,
                              user_id INT NOT NULL,
@@ -411,3 +387,22 @@ CREATE TABLE scheduled_operation (
                                      INDEX idx_user_next (user_id, next_run_at),
                                      INDEX idx_next_status (next_run_at, status)
 );
+
+-- 32. 向量库嵌入任务表（多源异构数据处理）
+CREATE TABLE embed_task (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    user_id INT NOT NULL COMMENT '用户ID',
+    source VARCHAR(20) NOT NULL COMMENT 'memo|message|pdf|image_desc',
+    source_id VARCHAR(50) NOT NULL COMMENT '对应业务表主键',
+    action VARCHAR(10) NOT NULL DEFAULT 'upsert' COMMENT 'upsert|delete',
+    text_snapshot TEXT NULL COMMENT '嵌入时的完整文本快照（delete 时可为空）',
+    status VARCHAR(20) NOT NULL DEFAULT 'pending' COMMENT 'pending|processing|success|failed|waiting_enrich',
+    retry_count INT NOT NULL DEFAULT 0,
+    max_retry INT NOT NULL DEFAULT 3,
+    error_msg VARCHAR(500) NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_status_created (status, created_at),
+    INDEX idx_source (source, source_id),
+    INDEX idx_user (user_id)
+) COMMENT '向量库嵌入任务表，统一管理多源异构数据的嵌入与删除';

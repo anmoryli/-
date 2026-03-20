@@ -106,6 +106,7 @@ export function MarkdownView({
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={url}
+                      loading="lazy"
                       alt={typeof children === "string" ? children : "图片"}
                       className="rounded-lg max-w-full max-h-[360px] w-auto h-auto object-contain"
                       referrerPolicy="no-referrer"
@@ -139,6 +140,7 @@ export function MarkdownView({
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={safeSrc}
+                    loading="lazy"
                     alt={altText ?? ""}
                     className="rounded-lg max-w-full max-h-[360px] w-auto h-auto object-contain"
                     referrerPolicy="no-referrer"

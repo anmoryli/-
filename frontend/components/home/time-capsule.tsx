@@ -78,8 +78,9 @@ export function TimeCapsule({ records, userId }: TimeCapsuleProps) {
         <div className="px-4 pb-4 pt-0">
           {capsule.firstPhoto ? (
             <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-[var(--card-bg)]">
-              <img
-                src={capsule.firstPhoto}
+<img
+              src={capsule.firstPhoto}
+              loading="lazy"
                 alt=""
                 className="h-full w-full object-cover"
               />

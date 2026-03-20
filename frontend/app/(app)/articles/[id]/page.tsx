@@ -58,6 +58,7 @@ export default function ArticleDetailPage() {
             {article.coverUrl ? (
               <img
                 src={article.coverUrl}
+                loading="lazy"
                 alt=""
                 className="mb-4 w-full rounded-xl object-cover"
               />

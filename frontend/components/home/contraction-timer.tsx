@@ -138,12 +138,12 @@ export function ContractionTimer({ userId, lastMenstrualDate, dueDate }: Contrac
         <div className="mt-4 space-y-2">
           <p className="text-micro font-medium text-[var(--foreground-muted)]">今日记录</p>
           {contractions.map((c, i) => (
-            <div key={i} className="flex justify-between rounded-lg bg-[var(--muted)]/50 px-3 py-2 text-caption">
-              <span>
+            <div key={i} className="flex justify-between gap-2 rounded-lg bg-[var(--muted)]/50 px-3 py-2 text-caption min-w-0">
+              <span className="whitespace-nowrap overflow-hidden text-ellipsis shrink-0">
                 {format(new Date(c.startedAt), "HH:mm", { locale: zhCN })} · 持续 {c.durationSeconds}秒
               </span>
               {i > 0 && (
-                <span className="text-[var(--accent-2)]">间隔 {intervals[i - 1]}分钟</span>
+                <span className="text-[var(--accent-2)] whitespace-nowrap shrink-0">间隔 {intervals[i - 1]}分钟</span>
               )}
             </div>
           ))}

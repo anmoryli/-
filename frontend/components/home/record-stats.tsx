@@ -54,17 +54,17 @@ export function RecordStats({ records }: RecordStatsProps) {
           </Link>
         </div>
       </div>
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-nowrap gap-2 overflow-x-auto scrollbar-hide">
         {stats.map((s) => {
           const Icon = s.icon
           return (
             <div
               key={s.label}
-              className="flex items-center gap-2 rounded-lg border border-[var(--card-border)] bg-[var(--muted)]/50 px-3 py-2"
+              className="flex shrink-0 items-center gap-2 rounded-lg border border-[var(--card-border)] bg-[var(--muted)]/50 px-3 py-2"
             >
-              <Icon className="h-4 w-4 text-[var(--foreground-muted)]" strokeWidth={1.5} />
-              <span className="text-caption text-[var(--foreground-secondary)]">{s.label}</span>
-              <span className="font-semibold text-[var(--foreground)]">
+              <Icon className="h-4 w-4 shrink-0 text-[var(--foreground-muted)]" strokeWidth={1.5} />
+              <span className="text-caption text-[var(--foreground-secondary)] whitespace-nowrap">{s.label}</span>
+              <span className="font-semibold text-[var(--foreground)] whitespace-nowrap">
                 {s.value}
                 {s.suffix ?? ""}
               </span>

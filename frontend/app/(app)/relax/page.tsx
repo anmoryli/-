@@ -71,6 +71,10 @@ export default function RelaxPage() {
   const { stages, durations } = PATTERNS[pattern]
 
   const handlePlay = (m: RelaxMusic) => {
+    if (!m.fileUrl) {
+      toast.error("音频地址无效，无法播放")
+      return
+    }
     if (player.track?.musicId === m.musicId && player.isPlaying) {
       player.pause()
     } else if (player.track?.musicId === m.musicId) {

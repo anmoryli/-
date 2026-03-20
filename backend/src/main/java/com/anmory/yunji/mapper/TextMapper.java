@@ -67,4 +67,15 @@ public interface TextMapper {
     @Select("select count(text_id) from yunfu.text")
     Integer getTextCount();
 
+    @Select("<script>SELECT t.text_id, t.memo_id, t.title, t.content, t.created_at, t.updated_at FROM yunfu.text t WHERE t.memo_id IN <foreach collection='memoIds' item='id' open='(' separator=',' close=')'>#{id}</foreach></script>")
+    @Results({
+            @Result(column = "text_id", property = "textId"),
+            @Result(column = "memo_id", property = "memoId"),
+            @Result(column = "title", property = "title"),
+            @Result(column = "content", property = "content"),
+            @Result(column = "created_at", property = "createdAt"),
+            @Result(column = "updated_at", property = "updatedAt")
+    })
+    List<Text> selectByMemoIds(@Param("memoIds") List<Integer> memoIds);
+
 }

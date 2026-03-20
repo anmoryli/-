@@ -145,29 +145,29 @@ export function ShareCard({ username, lastMenstrualDate, dueDate }: ShareCardPro
         生成分享卡片
       </button>
       <div
-        className="rounded-xl border-2 p-6"
+        className="rounded-xl border-2 p-6 overflow-hidden min-w-0"
         style={{
           borderColor: "rgba(227, 184, 176, 0.5)",
           backgroundColor: "#FDFAF7",
           minWidth: 320,
         }}
       >
-        <p className="text-center text-[11px] uppercase tracking-widest" style={{ color: "#8A8885" }}>
+        <p className="text-center text-[11px] uppercase tracking-widest whitespace-nowrap overflow-hidden text-ellipsis px-2" style={{ color: "#8A8885" }}>
           孕期宝
         </p>
-        <p className="mt-2 text-center text-[15px] font-medium" style={{ color: "#3D3B39" }}>
+        <p className="mt-2 text-center text-[15px] font-medium whitespace-nowrap overflow-hidden text-ellipsis px-2" style={{ color: "#3D3B39" }}>
           {username}
         </p>
-        <p className="mt-4 text-center text-3xl font-semibold" style={{ color: "#3D3B39" }}>
+        <p className="mt-4 text-center text-3xl font-semibold whitespace-nowrap overflow-hidden text-ellipsis px-2" style={{ color: "#3D3B39" }}>
           {info.weeksPregnant}周{info.daysInCurrentWeek}天
         </p>
-        <p className="mt-2 text-center text-[14px]" style={{ color: "#E3B8B0" }}>
+        <p className="mt-2 text-center text-[14px] whitespace-nowrap overflow-hidden text-ellipsis px-2" style={{ color: "#E3B8B0" }}>
           {countdownMsg}
         </p>
-        <p className="mt-4 text-center text-[13px]" style={{ color: "#8A8885" }}>
+        <p className="mt-4 text-center text-[13px] whitespace-nowrap overflow-hidden text-ellipsis px-2" style={{ color: "#8A8885" }} title={`宝宝约 ${babySize.name} 大小 · 距预产期 ${info.daysRemaining} 天`}>
           宝宝约 {babySize.name} 大小 · 距预产期 {info.daysRemaining} 天
         </p>
-        <p className="mt-6 text-center text-[10px]" style={{ color: "#A8A5A1" }}>
+        <p className="mt-6 text-center text-[10px] whitespace-nowrap overflow-hidden text-ellipsis px-2" style={{ color: "#A8A5A1" }}>
           愿这段孕期时光，成为永恒的美好
         </p>
       </div>
