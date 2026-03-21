@@ -1,0 +1,74 @@
+============================================================
+孕期宝UML文档转换工具
+使用PlantUML生成图像并嵌入Word文档
+============================================================
+📄 输入文件: /mnt/d/Code/Project/Merge/yunqibao/users/孕期宝架构设计文档.md
+📄 输出文件: /mnt/d/Code/Project/Merge/yunqibao/users/孕期宝UML完整文档.docx
+📊 文件大小: 55,497 字节
+📖 读取Markdown文档: /mnt/d/Code/Project/Merge/yunqibao/users/孕期宝架构设计文档.md
+🔧 设置PlantUML环境...
+🖼️ 图像临时目录: /tmp/tmp425t4in8
+📋 解析Markdown文档...
+📊 发现 14 个PlantUML代码块
+🎨 生成UML图像...
+  处理UML图 1/14...
+✅ 生成UML图 1: /tmp/tmp425t4in8/uml_1.png
+  处理UML图 2/14...
+✅ 生成UML图 2: /tmp/tmp425t4in8/uml_2.png
+  处理UML图 3/14...
+✅ 生成UML图 3: /tmp/tmp425t4in8/uml_3.png
+  处理UML图 4/14...
+✅ 生成UML图 4: /tmp/tmp425t4in8/uml_4.png
+  处理UML图 5/14...
+✅ 生成UML图 5: /tmp/tmp425t4in8/uml_5.png
+  处理UML图 6/14...
+✅ 生成UML图 6: /tmp/tmp425t4in8/uml_6.png
+  处理UML图 7/14...
+⚠️ PlantUML错误 (图7): Error line 73 in file: /tmp/tmpcehjiyoq/uml_7.puml
+Some diagram description contains errors
+
+  处理UML图 8/14...
+⚠️ PlantUML错误 (图8): Error line 9 in file: /tmp/tmpv34a94_e/uml_8.puml
+Some diagram description contains errors
+
+  处理UML图 9/14...
+⚠️ PlantUML错误 (图9): Error line 24 in file: /tmp/tmphry78ca0/uml_9.puml
+Some diagram description contains errors
+
+  处理UML图 10/14...
+✅ 生成UML图 10: /tmp/tmp425t4in8/uml_10.png
+  处理UML图 11/14...
+⚠️ PlantUML错误 (图11): Error line 116 in file: /tmp/tmp3we9ap0v/uml_11.puml
+Some diagram description contains errors
+
+  处理UML图 12/14...
+✅ 生成UML图 12: /tmp/tmp425t4in8/uml_12.png
+  处理UML图 13/14...
+⚠️ PlantUML错误 (图13): Error line 15 in file: /tmp/tmplpknvlzq/uml_13.puml
+Some diagram description contains errors
+
+  处理UML图 14/14...
+⚠️ PlantUML错误 (图14): Error line 74 in file: /tmp/tmpmz3cjy1a/uml_14.puml
+Some diagram description contains errors
+
+📄 创建Word文档...
+✍️ 写入文档内容...
+  已插入UML图 1
+  已插入UML图 2
+  已插入UML图 3
+  已插入UML图 4
+  已插入UML图 5
+  已插入UML图 6
+  已插入UML图 10
+  已插入UML图 12
+💾 保存文档: /mnt/d/Code/Project/Merge/yunqibao/users/孕期宝UML完整文档.docx
+🧹 清理临时文件
+============================================================
+✅ 转换成功!
+📁 输出文件: /mnt/d/Code/Project/Merge/yunqibao/users/孕期宝UML完整文档.docx
+💾 文件大小: 1,347,112 字节 (1315.5 KB)
+⏱️ 耗时: 16.3 秒
+============================================================
+📈 统计:
+   - UML图数量: 14
+   - 文档页数: 约 270 页
